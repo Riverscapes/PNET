@@ -126,7 +126,7 @@ def main():
         # Make a new layer of only segments that are between 80 and 400m, and intersect the field points
         if restrict_segment_length:
             arcpy.SelectLayerByAttribute_management\
-                (network_layer, 'NEW_SELECTION', 'NHD_LEN >{} AND NHD_LEN <{}'.format(min_seg, max_seg))
+                (network_layer, 'NEW_SELECTION', 'FldRchLen >{} AND FldRchLen <{}'.format(min_seg, max_seg))
             arcpy.SelectLayerByLocation_management\
                 (network_layer, 'INTERSECT', merge_location, selection_type="SUBSET_SELECTION")
         else:

@@ -200,10 +200,13 @@ def keep_fields(shapefile, fields_to_keep):
     arcpy.DeleteField_management(shapefile, delete_fields)
 
 
-def remove_empty_fields(shapefile):
+def remove_empty_fields(shapefile, exceptions=["TempField"]):
 
     field_names = [f.name for f in arcpy.ListFields(shapefile)]
     bad_fields = []
+    for exception in exceptions:
+        if exception in field_names:
+            field_names.remove(exception)
     for field in field_names:
         with arcpy.da.SearchCursor(shapefile, field) as cursor:
             this_field = []

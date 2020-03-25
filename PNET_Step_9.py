@@ -288,10 +288,10 @@ def create_plots(comparison_points, pnet_plot_fields, field_plot_fields, field_n
                ylabel='Field Measured')
 
         # add legend
-        legend = plt.legend(loc="upper left", bbox_to_anchor=(1,1))
+        #legend = plt.legend(loc="upper left", bbox_to_anchor=(1,1))
         # save plot
         plot_name = os.path.join(out_folder, "{}_Plot.png".format(field_name))
-        plt.savefig(plot_name, bbox_extra_artists=(legend,), bbox_inches='tight')
+        plt.savefig(plot_name, bbox_inches='tight')
         plt.close()
 
 
@@ -329,7 +329,7 @@ def plot_regression(x, y, axis, new_max):
     lower_ci = model_y - error
     #axis.fill_between(model_x, y1=upper_ci, y2=lower_ci, facecolor='red', alpha=0.3, label="95% Confidence Interval")
     # in-plot legend
-    axis.legend(loc='best', frameon=False)
+    #axis.legend(loc='best', frameon=False)
     return regression.rvalue**2
 
 

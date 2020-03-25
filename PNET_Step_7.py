@@ -88,15 +88,19 @@ def main():
             pnet_fields = get_fields(old_reaches)
             fields_to_keep = pnet_fields + data_network_fields
 
+
+
             # Extracts data from the data network to PIBO reaches using a weighted average system.
             extract_network(reaches, clipped_data_network, reaches_save, data_network_folder, pnet_fields)
 
             # Remove all unnecessary fields
             keep_fields(reaches_save, fields_to_keep)
-            remove_empty_fields(reaches_save)
+            remove_empty_fields(reaches_save, pnet_fields)
 
             # Delete any temporary shape files created
             delete_temps(to_delete)
+
+
 
             create_csv(os.path.join(data_network_folder, "{}.csv".format(data_network_name)), reaches_save)
             to_merge[data_network_count].append([reaches_save, data_network_name])
