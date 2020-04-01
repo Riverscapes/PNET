@@ -58,6 +58,7 @@ def main():
         field_data_list = csv_to_list(watershed_db)
 
         # Find certain field indexes in the field database
+
         id_field_db = field_data_list[0].index("""RchID""")
         field_indexes_db = []
         for field_db_field in field_db_fields:
@@ -280,19 +281,19 @@ def create_plots(comparison_points, pnet_plot_fields, field_plot_fields, field_n
 
         plot_points(x, y, ax)
         if len(x) > 1:
-            r2_value = plot_regression(x, y, ax, new_max)
-        ax.plot([0, new_max], [0, new_max], color='blue', linewidth=1.5, linestyle=":", label='Line of Perfect Agreement')
+            r2_value, slope, intercept = plot_regression(x, y, ax, new_max)
+            ax.plot([0, new_max], [0, new_max], color='blue', linewidth=1.5, linestyle=":", label='Line of Perfect Agreement')
 
-        ax.set(title='PNET {0} vs. Field Measured {0} (R2 = {1})'.format(field_name, round(r2_value, 2)),
-               xlabel='PNET',
-               ylabel='Field Measured')
+            ax.set(title='PNET {0} vs. Field Measured {0} (R2 = {1})'.format(field_name, round(r2_value, 2)),
+                   xlabel='PNET\n Regression = {}x + {}\n n = {}'.format(round(slope,2), round(intercept,2), len(x)),
+                   ylabel='Field Measured')
 
-        # add legend
-        #legend = plt.legend(loc="upper left", bbox_to_anchor=(1,1))
-        # save plot
-        plot_name = os.path.join(out_folder, "{}_Plot.png".format(field_name))
-        plt.savefig(plot_name, bbox_inches='tight')
-        plt.close()
+            # add legend
+            #legend = plt.legend(loc="upper left", bbox_to_anchor=(1,1))
+            # save plot
+            plot_name = os.path.join(out_folder, "{}_Plot.png".format(field_name))
+            plt.savefig(plot_name, bbox_inches='tight')
+            plt.close()
 
 
 def clean_values(output_points, pnet_field, field_db_field):
@@ -330,7 +331,7 @@ def plot_regression(x, y, axis, new_max):
     #axis.fill_between(model_x, y1=upper_ci, y2=lower_ci, facecolor='red', alpha=0.3, label="95% Confidence Interval")
     # in-plot legend
     #axis.legend(loc='best', frameon=False)
-    return regression.rvalue**2
+    return regression.rvalue**2, regression.slope, regression.intercept
 
 
 if __name__ == "__main__":
