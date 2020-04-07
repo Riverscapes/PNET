@@ -1,6 +1,7 @@
 import arcpy
 import os
-from PNET_Functions import make_folder, remove_folder, get_folder_list, finish
+from PNET_Functions import make_folder, remove_folder, get_folder_list, \
+    finish, attribute_table_to_list, get_field_index, delete_temps
 
 # -------------------------------------------------------------------------------
 # Name:        PNET Step 1
@@ -22,6 +23,8 @@ bor_points = arcpy.GetParameterAsText(2)
 stream_network = arcpy.GetParameterAsText(3)
 # A Folder where you want the main structure of this project to be created
 root_folder = arcpy.GetParameterAsText(4)
+# Data year (The year which you want field data to be closest to)
+data_year = int(arcpy.GetParameterAsText(5))
 
 
 def main():
@@ -32,6 +35,7 @@ def main():
     to_merge_tor = []
     to_merge_bor = []
     to_merge_network = []
+    temps_to_delete = []
     watershed_layer = "Watershed"
     arcpy.MakeFeatureLayer_management(watersheds, watershed_layer)
 
@@ -62,18 +66,24 @@ def main():
 
         # Clip the TOR points to this watershed and save them
         tor_save_location = os.path.join(watershed_folder, "Inputs", "Points", "TOR_Points.shp")
-        arcpy.Clip_analysis(tor_points, clipped_watershed, tor_save_location)
-        # TODO make more general
-        arcpy.DeleteIdentical_management(tor_save_location, ["RchID"])
-        arcpy.DeleteIdentical_management(tor_save_location, ["SiteID"])
+        tor_temp_location = os.path.join(watershed_folder, "Inputs", "Points", "TOR_Points_Temp.shp")
+        temps_to_delete.append(tor_temp_location)
+        arcpy.Clip_analysis(tor_points, clipped_watershed, tor_temp_location)
+
+        # Only save one point per reach and site
+        year_dif_field = create_year_distance(tor_temp_location, "yr")
+        delete_identical(tor_temp_location, "SiteID", year_dif_field, "RchID", tor_save_location)
         to_merge_tor.append(tor_save_location)
 
         # Clip the BOR points to this watershed and save them
         bor_save_location = os.path.join(watershed_folder, "Inputs", "Points", "BOR_Points.shp")
-        arcpy.Clip_analysis(bor_points, clipped_watershed, bor_save_location)
-        # TODO make more general
-        arcpy.DeleteIdentical_management(bor_save_location, ["RchID"])
-        arcpy.DeleteIdentical_management(bor_save_location, ["SiteID"])
+        bor_temp_location = os.path.join(watershed_folder, "Inputs", "Points", "BOR_Points_Temp.shp")
+        temps_to_delete.append(bor_temp_location)
+        arcpy.Clip_analysis(bor_points, clipped_watershed, bor_temp_location)
+
+        # Only save one point per reach and site
+        create_year_distance(bor_temp_location, "yr")
+        delete_identical(bor_temp_location, "SiteID", year_dif_field, "RchID", bor_save_location)
         to_merge_bor.append(bor_save_location)
 
         # Clip the stream_network to this watershed and save it
@@ -91,15 +101,11 @@ def main():
     # Merge every Watershed's TOR points, and save it to the ProjectWide folder
     tor_save_location = os.path.join(project_folder, "Inputs", "Points", "TOR_Points.shp")
     arcpy.Merge_management(to_merge_tor, tor_save_location)
-    # TODO make more general
-    arcpy.DeleteIdentical_management(tor_save_location, ["RchID"])
 
     arcpy.AddMessage("\t Saving BOR Points...")
     # Merge every Watershed's BOR points, and save it to the ProjectWide folder
     bor_save_location = os.path.join(project_folder, "Inputs", "Points", "BOR_Points.shp")
     arcpy.Merge_management(to_merge_bor, bor_save_location)
-    # TODO make more general
-    arcpy.DeleteIdentical_management(bor_save_location, ["RchID"])
 
     arcpy.AddMessage("\t Saving Stream Network...")
 
@@ -111,6 +117,8 @@ def main():
     # Take Watershed Boundaries, and save it to the ProjectWide folder
     wat_save_location = os.path.join(project_folder, "Inputs", "Watershed_Boundary", "Watershed_Boundary.shp")
     arcpy.Copy_management(watersheds, wat_save_location)
+
+    delete_temps(temps_to_delete)
 
     finish()
 
@@ -157,6 +165,58 @@ def make_structure(main_folder, watershed_name):
 
     return watershed_folder
 
+
+def create_year_distance(shapefile, year_field):
+    # Creates a field showing how far away (timewise) the reach is from our target year
+    new_field = "Year_Dif"
+    arcpy.AddField_management(shapefile, new_field, "SHORT")
+    arcpy.CalculateField_management(shapefile, new_field, "abs(2016 - !{}!)".format(year_field),"PYTHON_9.3", "")
+    return new_field
+
+
+def delete_identical(shapefile, group_field, year_dif_field, id_field, final_save):
+
+    data_list = attribute_table_to_list(shapefile)
+    group_index = get_field_index(group_field, shapefile)
+    year_index = get_field_index(year_dif_field, shapefile)
+    id_index = get_field_index(id_field, shapefile)
+
+    # Create a dictionary with entries for each group
+    site_dictionary = {}
+
+    for row in data_list:
+        if row[group_index] not in site_dictionary:
+            site_dictionary[row[group_index]] = []
+        site_dictionary[row[group_index]].append(row[1:])
+
+    # A list of all reach IDs that need to be kept
+    keep_reaches = []
+
+    # Look at every site
+    for site in site_dictionary:
+        # Create a list of all the different year differences
+        year_difs = []
+        for reach in site_dictionary[site]:
+            year_difs.append(reach[year_index-1])
+
+        # Find which reach has the smallest year difference in the site
+        minimum = min(year_difs)
+        for reach in site_dictionary[site]:
+            if reach[year_index-1] == minimum:
+                keep_reach = reach[id_index-1]
+        keep_reaches.append(keep_reach)
+
+    # Create a layer to select from
+    select_layer = "Reaches"
+    arcpy.MakeFeatureLayer_management(shapefile, select_layer)
+
+    # Select all of the reaches we want to keep then invert the selection
+    for good_reach in keep_reaches:
+        arcpy.SelectLayerByAttribute_management(select_layer, 'ADD_TO_SELECTION',
+                                                '{} = {}'.format(id_field, good_reach))
+
+
+    arcpy.CopyFeatures_management(select_layer, final_save)
 
 if __name__ == "__main__":
     main()
