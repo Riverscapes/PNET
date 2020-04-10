@@ -2,7 +2,7 @@ import arcpy
 import os
 import re
 from PNET_Functions import get_watershed_folders, delete_old, finish, \
-    delete_temps, make_folder, create_csv, read_file, keep_fields, get_fields, remove_empty_fields
+    delete_temps, make_folder, create_csv, read_file, keep_fields, get_fields, remove_empty_fields, is_empty
 
 # -------------------------------------------------------------------------------
 # Name:        PNET Step 7
@@ -44,66 +44,67 @@ def main():
 
         arcpy.AddMessage("Starting " + watershed_folder + "...")
         for data_network_count, data_network in enumerate(network_list):
+            if not is_empty(data_network):
 
-            old_reaches = os.path.join(watershed_folder, "Intermediates",
-                                       "Extraction", "Inputs", "Field_Reaches_Clean.shp")
+                old_reaches = os.path.join(watershed_folder, "Intermediates",
+                                           "Extraction", "Inputs", "Field_Reaches_Clean.shp")
 
-            # Create a name for this data network so it can have a unique save location
-            data_network_name = data_network.replace(os.path.join(watershed_folder, "Inputs", "Data_Networks"), "")
-            data_network_name = data_network_name.replace(".shp", "")
-            data_network_name = data_network_name.replace("\\", "")
+                # Create a name for this data network so it can have a unique save location
+                data_network_name = data_network.replace(os.path.join(watershed_folder, "Inputs", "Data_Networks"), "")
+                data_network_name = data_network_name.replace(".shp", "")
+                data_network_name = data_network_name.replace("\\", "")
 
-            arcpy.AddMessage("\tStarting {}...".format(data_network_name))
+                arcpy.AddMessage("\tStarting {}...".format(data_network_name))
 
-            data_network_folder = make_folder(output_folder, data_network_name)
-            delete_old(data_network_folder)
+                data_network_folder = make_folder(output_folder, data_network_name)
+                delete_old(data_network_folder)
 
-            reaches = os.path.join(data_network_folder, "Reaches_Temp.shp")
+                reaches = os.path.join(data_network_folder, "Reaches_Temp.shp")
 
-            to_delete.append(reaches)
+                to_delete.append(reaches)
 
-            reaches_save = os.path.join(data_network_folder, data_network_name + "_Points_Extracted.shp")
+                reaches_save = os.path.join(data_network_folder, data_network_name + "_Points_Extracted.shp")
 
-            arcpy.CopyFeatures_management(old_reaches, reaches)
+                arcpy.CopyFeatures_management(old_reaches, reaches)
 
-            # Clip the data network to the Field reaches. This is important for calculating the math later
-            clip = os.path.join(data_network_folder, "Clip_Temp.shp")
-            to_delete.append(clip)
+                # Clip the data network to the Field reaches. This is important for calculating the math later
+                clip = os.path.join(data_network_folder, "Clip_Temp.shp")
+                to_delete.append(clip)
 
-            arcpy.Clip_analysis(data_network, reaches, clip)
-            clipped_data_network = clip
+                arcpy.Clip_analysis(data_network, reaches, clip)
+                clipped_data_network = clip
 
-            # Adds field CLIP_LEN, which is the length of the clipped data segment
-            arcpy.AddField_management(clipped_data_network, "CLIP_LEN", "DOUBLE")
-            arcpy.CalculateField_management(clipped_data_network, "CLIP_LEN", "!shape.length@meters!", "PYTHON_9.3", "")
+                # Adds field CLIP_LEN, which is the length of the clipped data segment
+                arcpy.AddField_management(clipped_data_network, "CLIP_LEN", "DOUBLE")
+                arcpy.CalculateField_management(clipped_data_network, "CLIP_LEN", "!shape.length@meters!", "PYTHON_9.3", "")
 
-            # These fields is unnecessary and causes issues with merging, so they are deleted
-            field_names = [f.name for f in arcpy.ListFields(clipped_data_network)]
-            fields_to_delete = ["Join_Count", "TARGET_FID", "Join_Cou_1"]
-            for field in fields_to_delete:
-                if field in field_names:
-                    arcpy.DeleteField_management(clipped_data_network, field)
+                # These fields is unnecessary and causes issues with merging, so they are deleted
+                field_names = [f.name for f in arcpy.ListFields(clipped_data_network)]
+                fields_to_delete = ["Join_Count", "TARGET_FID", "Join_Cou_1"]
+                for field in fields_to_delete:
+                    if field in field_names:
+                        arcpy.DeleteField_management(clipped_data_network, field)
 
-            data_network_fields = get_fields(data_network)
-            pnet_fields = get_fields(old_reaches)
-            fields_to_keep = pnet_fields + data_network_fields
-
-
-
-            # Extracts data from the data network to PIBO reaches using a weighted average system.
-            extract_network(reaches, clipped_data_network, reaches_save, data_network_folder, pnet_fields)
-
-            # Remove all unnecessary fields
-            keep_fields(reaches_save, fields_to_keep)
-            remove_empty_fields(reaches_save, pnet_fields)
-
-            # Delete any temporary shape files created
-            delete_temps(to_delete)
+                data_network_fields = get_fields(data_network)
+                pnet_fields = get_fields(old_reaches)
+                fields_to_keep = pnet_fields + data_network_fields
 
 
 
-            create_csv(os.path.join(data_network_folder, "{}.csv".format(data_network_name)), reaches_save)
-            to_merge[data_network_count].append([reaches_save, data_network_name])
+                # Extracts data from the data network to PIBO reaches using a weighted average system.
+                extract_network(reaches, clipped_data_network, reaches_save, data_network_folder, pnet_fields)
+
+                # Remove all unnecessary fields
+                keep_fields(reaches_save, fields_to_keep)
+                #remove_empty_fields(reaches_save, pnet_fields)
+
+                # Delete any temporary shape files created
+                delete_temps(to_delete)
+
+
+
+                create_csv(os.path.join(data_network_folder, "{}.csv".format(data_network_name)), reaches_save)
+                to_merge[data_network_count].append([reaches_save, data_network_name])
 
     # Iterate through to_merge, and save a point and network shapefile for each data network
 
