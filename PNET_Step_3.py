@@ -14,15 +14,9 @@ from PNET_Functions import get_watershed_folders, delete_old, finish, delete_tem
 
 # The folder containing all watershed folders
 root_folder = arcpy.GetParameterAsText(0)
-# If True, this tool will only keep segmment min and segment max
-restrict_segment_length = parse_bool(arcpy.GetParameterAsText(1))
-# The minimum segment length to keep
-min_seg = int(arcpy.GetParameterAsText(2))
-# The maximum segment to keep
-max_seg = int(arcpy.GetParameterAsText(3))
 # If True, this indicates that the user edited the unsnapped points, and the corrections are now saved in
 # ProjectWide/Intermediates/Points/Unsnapped_Fixed
-fixed_points = parse_bool(arcpy.GetParameterAsText(4))
+fixed_points = parse_bool(arcpy.GetParameterAsText(1))
 
 
 def main():
@@ -123,15 +117,9 @@ def main():
         network_layer = "Network"
         arcpy.MakeFeatureLayer_management(network, network_layer)
 
-        # Make a new layer of only segments that are between 80 and 400m, and intersect the field points
-        if restrict_segment_length:
-            arcpy.SelectLayerByAttribute_management\
-                (network_layer, 'NEW_SELECTION', 'FldRchLen >{} AND FldRchLen <{}'.format(min_seg, max_seg))
-            arcpy.SelectLayerByLocation_management\
-                (network_layer, 'INTERSECT', merge_location, selection_type="SUBSET_SELECTION")
-        else:
-            arcpy.SelectLayerByLocation_management\
-                (network_layer, 'INTERSECT', merge_location)
+        # Make a new layer of only segments that intersect the field points
+        arcpy.SelectLayerByLocation_management\
+            (network_layer, 'INTERSECT', merge_location)
 
         save_location = os.path.join(watershed_folder, "Intermediates",
                                      "Reach_Editing", "Inputs", "Stream_Network_Segments.shp")
