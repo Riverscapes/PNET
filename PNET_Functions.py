@@ -214,7 +214,9 @@ def remove_empty_fields(shapefile, exceptions=["TempField"]):
                 this_field.append(row[0])
             if len(set(this_field)) == 1:
                 bad_fields.append(field)
-    arcpy.DeleteField_management(shapefile, bad_fields)
+    for bad_field in bad_fields:
+        if bad_field in get_fields(shapefile):
+            arcpy.DeleteField_management(shapefile, bad_field)
     return bad_fields
 
 
