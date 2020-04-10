@@ -1,15 +1,16 @@
 import arcpy
 import os
 import shutil
-from PNET_Functions import get_watershed_folders, delete_old, create_csv, get_fields, csv_to_list, parse_multistring
+from PNET_Functions import get_watershed_folders, delete_old, create_csv,\
+    get_fields, csv_to_list, parse_multistring, make_folder
 import scipy.stats as stat
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 
 # -------------------------------------------------------------------------------
 # Name:        PNET Step 9
 # Purpose:     Creates Comparison Fields
-#
 # Author:      Tyler Hatch
 #
 # Created:     3/1/2020
@@ -23,10 +24,13 @@ field_db = arcpy.GetParameterAsText(1)
 
 # Fields from PNET that we want to compare (must be in same order as field database fields)
 pnet_fields = parse_multistring(arcpy.GetParameterAsText(2))
+
 # Fields from the field that we want to compare (must be in same order as PNET fields)
 field_db_fields = parse_multistring(arcpy.GetParameterAsText(3))
 # What you want the new names of the fields to be when comparing
 new_fields_initial = parse_multistring(arcpy.GetParameterAsText(4))
+# Ignore Negatives in plots
+ignore_neg = True
 
 
 def main():
@@ -35,24 +39,31 @@ def main():
     watershed_folders = get_watershed_folders(root_folder)
 
     # Setup projectwide data
-    projectwide_output = os.path.join(root_folder, "00_ProjectWide", "Outputs", "Comparisons")
+
+    projectwide_output = make_folder(os.path.join(root_folder, "00_ProjectWide", "Outputs", "Comparisons"), "Numerical")
     save_db(field_db, os.path.join(root_folder, "00_ProjectWide"))
     delete_old(projectwide_output)
 
-    keep_fields = ["FID", "Shape", "POINT_X", "POINT_Y", "SnapDist"]
+    keep_fields = ["FID", "Shape", "POINT_X", "POINT_Y", "SnapDist", "FldRchLen"]
 
     to_merge = []
 
     for watershed in watershed_folders:
 
+        old_pnet_fields = pnet_fields
+        old_field_db_fields = field_db_fields
+        old_new_fields_initial = new_fields_initial
+
+
         arcpy.AddMessage("Working on {}...".format(watershed))
 
         # Setup watershed data
-        watershed_output = os.path.join(watershed, "Outputs", "Comparisons")
+        watershed_output = make_folder(os.path.join(watershed, "Outputs", "Comparisons"), "Numerical")
         delete_old(watershed_output)
 
         # Get the CSV with Field data
         watershed_db = save_db(field_db, watershed)
+
 
         # Get data from the field database
         field_data_list = csv_to_list(watershed_db)
@@ -61,7 +72,7 @@ def main():
 
         id_field_db = field_data_list[0].index("""RchID""")
         field_indexes_db = []
-        for field_db_field in field_db_fields:
+        for field_db_field in old_field_db_fields:
             field_indexes_db.append(field_data_list[0].index(field_db_field))
 
         # remove headers
@@ -87,7 +98,7 @@ def main():
         # Find certain PNET indexes in the PNET output
         id_pnet = pnet_data_list[0].index("""RchID""")
         pnet_indexes = []
-        for pnet_field in pnet_fields:
+        for pnet_field in old_pnet_fields:
             pnet_indexes.append(pnet_data_list[0].index(pnet_field))
 
         # remove headers
@@ -106,7 +117,7 @@ def main():
 
         # Make list of new fields
         new_fields = ["""RchID"""]
-        for new_field in new_fields_initial:
+        for new_field in old_new_fields_initial:
             # make sure the field can fit into an arcmap field
             # This is where PNET data will go
             new_fields.append("pnet_" + new_field[:5])
@@ -147,7 +158,7 @@ def main():
             for pnet_data, field_data, in zip(pnet_iter, field_iter):
 
                 # Make sure that the data is not missing
-                if pnet_data != "" and field_data != "":
+                if pnet_data != "" and field_data != "" and pnet_data != '0' and field_data != '0':
 
                     # Add data into the new row
                     pnet_num = float(pnet_data)
@@ -185,7 +196,7 @@ def main():
 
         # Create a new shapefile to hold data
         template = os.path.join(watershed, "Outputs", "Extracted_Data", "Extraction_Merge_Points.shp")
-        comparison_points = arcpy.CreateFeatureclass_management(watershed_output, "Comparison_Points.shp",
+        comparison_points = arcpy.CreateFeatureclass_management(watershed_output, "Numerical_Comparison_Points.shp",
                                                                 "POINT", spatial_reference=template)
 
         # Add in new fields to the shapefile
@@ -216,7 +227,7 @@ def main():
         to_merge.append(comparison_points)
 
         # Save as CSV
-        create_csv(os.path.join(watershed_output, "Comparison_Data.csv"), comparison_points)
+        create_csv(os.path.join(watershed_output, "Numerical_Comparison_Data.csv"), comparison_points)
 
         # Make plots from points
         plot_list = get_fields(comparison_points)
@@ -228,11 +239,12 @@ def main():
             elif field.startswith('fld_'):
                 field_plot_list.append(field)
 
-        create_plots(comparison_points, pnet_plot_list, field_plot_list, new_fields_initial, watershed_output)
+        create_plots(comparison_points, pnet_plot_list, field_plot_list, old_new_fields_initial, watershed_output)
+
 
     arcpy.AddMessage('Saving ProjectWide...')
-    merged = arcpy.Merge_management(to_merge, os.path.join(projectwide_output, "Comparison_Points.shp"))
-    create_csv(os.path.join(projectwide_output, "Comparison_Data.csv"), merged)
+    merged = arcpy.Merge_management(to_merge, os.path.join(projectwide_output, "Numerical_Comparison_Points.shp"))
+    create_csv(os.path.join(projectwide_output, "Numerical_Comparison_Data.csv"), merged)
 
     # Make plots from points
     plot_list = get_fields(merged)
@@ -257,43 +269,55 @@ def create_plots(comparison_points, pnet_plot_fields, field_plot_fields, field_n
 
     for pnet_field, field_field, field_name in zip(pnet_plot_fields, field_plot_fields, field_names):
         x, y = clean_values(comparison_points, pnet_field, field_field)
+        if len(x) > 1 and len(y) > 1:
+            # set up plot
+            fig = plt.figure()
+            fig.add_axes()
+            ax = fig.add_subplot(111)
 
-        # set up plot
-        fig = plt.figure()
-        fig.add_axes()
-        ax = fig.add_subplot(111)
+            if field_name == 'Conifer_Proportion':
+                x = x*100
+            if field_name == 'Devegetation_Proportion':
+                x = x*100
+            if field_name == 'G_Invasive_Proportion':
+                x = x*100
+            if field_name == 'R_Invasive_Proportion':
+                x = x*100
+            if field_name == 'X_Invasive_Proportion':
+                x = x*100
 
+            # set axis range
 
-        # set axis range
+            new_min = min([min(x), min(y)])
+            new_max = max([max(x), max(y)])
+            range = new_max-new_min
+            buffer = range/30
+            ax.set_xlim(new_min-buffer, max(x)+buffer, 1)
+            ax.set_ylim(new_min-buffer, max(y)+buffer, 1)
+            ax.set_aspect(aspect='equal')
+            plt.setp(ax.get_xticklabels(), rotation=90, horizontalalignment='right')
+            a = math.floor((math.log10(range / 10))*-1)
+            increment = round(range, int(a)) / 10
+            plt.xticks(np.arange(min(x)-buffer, max(x)+buffer, step=increment))
+            plt.yticks(np.arange(min(y)-buffer, max(y)+buffer, step=increment))
 
-        new_min = min([min(x), min(y)])
-        new_max = max([max(x), max(y)])
-        range = new_max-new_min
-        buffer = range/30
-        ax.set_xlim(new_min-buffer, max(x)+buffer, 1)
-        ax.set_ylim(new_min-buffer, max(y)+buffer, 1)
-        ax.set_aspect(aspect='equal')
-        plt.setp(ax.get_xticklabels(), rotation=90, horizontalalignment='right')
-        plt.xticks(np.arange(min(x)-buffer, max(x)+buffer, range / 8))
-        plt.yticks(np.arange(min(y)-buffer, max(y)+buffer, range / 8))
+            # plot data points, regression line, 1:1 reference
 
-        # plot data points, regression line, 1:1 reference
+            plot_points(x, y, ax)
+            if len(x) > 1:
+                r2_value, slope, intercept = plot_regression(x, y, ax, new_max)
+                ax.plot([0, new_max], [0, new_max], color='blue', linewidth=1.5, linestyle=":", label='Line of Perfect Agreement')
 
-        plot_points(x, y, ax)
-        if len(x) > 1:
-            r2_value, slope, intercept = plot_regression(x, y, ax, new_max)
-            ax.plot([0, new_max], [0, new_max], color='blue', linewidth=1.5, linestyle=":", label='Line of Perfect Agreement')
+                ax.set(title='PNET {0} vs. Field Measured {0} (R2 = {1})'.format(field_name, round(r2_value, 2)),
+                       xlabel='PNET\n Regression = {}x + {}\n n = {}'.format(round(slope,2), round(intercept,2), len(x)),
+                       ylabel='Field Measured')
 
-            ax.set(title='PNET {0} vs. Field Measured {0} (R2 = {1})'.format(field_name, round(r2_value, 2)),
-                   xlabel='PNET\n Regression = {}x + {}\n n = {}'.format(round(slope,2), round(intercept,2), len(x)),
-                   ylabel='Field Measured')
-
-            # add legend
-            #legend = plt.legend(loc="upper left", bbox_to_anchor=(1,1))
-            # save plot
-            plot_name = os.path.join(out_folder, "{}_Plot.png".format(field_name))
-            plt.savefig(plot_name, bbox_inches='tight')
-            plt.close()
+                # add legend
+                #legend = plt.legend(loc="upper left", bbox_to_anchor=(1,1))
+                # save plot
+                plot_name = os.path.join(out_folder, "{}_Plot.png".format(field_name))
+                plt.savefig(plot_name, bbox_inches='tight')
+                plt.close()
 
 
 def clean_values(output_points, pnet_field, field_db_field):
@@ -305,6 +329,11 @@ def clean_values(output_points, pnet_field, field_db_field):
     # pull out observed values of zero
     x1 = x[np.nonzero(x)]
     y1 = y[np.nonzero(x)]
+
+    if ignore_neg:
+        x2 = x1[x1 >= 0]
+        y2 = y1[x1 >= 0]
+        return x2, y2
 
     return x1, y1
 
