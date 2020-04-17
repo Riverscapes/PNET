@@ -24,13 +24,12 @@ field_db = arcpy.GetParameterAsText(1)
 
 # Fields from PNET that we want to compare (must be in same order as field database fields)
 pnet_fields = parse_multistring(arcpy.GetParameterAsText(2))
-
 # Fields from the field that we want to compare (must be in same order as PNET fields)
 field_db_fields = parse_multistring(arcpy.GetParameterAsText(3))
 # What you want the new names of the fields to be when comparing
 new_fields_initial = parse_multistring(arcpy.GetParameterAsText(4))
-# Ignore Negatives in plots
-ignore_neg = True
+# CSV to set field data from instead (optional, expects headers)
+input_field_csv = arcpy.GetParameterAsText(5)
 
 
 def main():
@@ -48,6 +47,10 @@ def main():
 
     to_merge = []
 
+    # Check to see if the user is using the field CSV input, set the field lists to the values from that file
+    if is_csv(input_field_csv):
+        pnet_fields, field_db_fields, new_fields_initial = read_field_csv(input_field_csv)
+
     for watershed in watershed_folders:
 
         old_pnet_fields = pnet_fields
@@ -61,34 +64,6 @@ def main():
         watershed_output = make_folder(os.path.join(watershed, "Outputs", "Comparisons"), "Numerical")
         delete_old(watershed_output)
 
-        # Get the CSV with Field data
-        watershed_db = save_db(field_db, watershed)
-
-
-        # Get data from the field database
-        field_data_list = csv_to_list(watershed_db)
-
-        # Find certain field indexes in the field database
-
-        id_field_db = field_data_list[0].index("""RchID""")
-        field_indexes_db = []
-        for field_db_field in old_field_db_fields:
-            field_indexes_db.append(field_data_list[0].index(field_db_field))
-
-        # remove headers
-        field_data_list.pop(0)
-
-        # Create a list with only necessary data
-        field_compare_list = []
-        for row in field_data_list:
-            to_add = []
-            # Add id column
-            to_add.append(row[id_field_db])
-            # Add any other columns
-            for index in field_indexes_db:
-                to_add.append(row[index])
-            field_compare_list.append(to_add)
-
         # Get the CSV with extracted PNET data
         watershed_pnet = os.path.join(watershed, "Outputs", "Extracted_Data", "All_Data.csv")
 
@@ -98,8 +73,12 @@ def main():
         # Find certain PNET indexes in the PNET output
         id_pnet = pnet_data_list[0].index("""RchID""")
         pnet_indexes = []
+        missing_field_indexes = []
         for pnet_field in old_pnet_fields:
-            pnet_indexes.append(pnet_data_list[0].index(pnet_field))
+            if pnet_field in pnet_data_list[0]:
+                pnet_indexes.append(pnet_data_list[0].index(pnet_field))
+            else:
+                missing_field_indexes.append(old_pnet_fields.index(pnet_field))
 
         # remove headers
         pnet_data_list.pop(0)
@@ -115,20 +94,48 @@ def main():
                 to_add.append(row[index])
             pnet_compare_list.append(to_add)
 
+        # Get the CSV with Field data
+        watershed_db = save_db(field_db, watershed)
+
+        # Get data from the field database
+        field_data_list = csv_to_list(watershed_db)
+
+        # Find certain field indexes in the field database
+        id_field_db = field_data_list[0].index("""RchID""")
+        field_indexes_db = []
+        for field_db_field in old_field_db_fields:
+            if old_field_db_fields.index(field_db_field) not in missing_field_indexes:
+                field_indexes_db.append(field_data_list[0].index(field_db_field))
+
+        # remove headers
+        field_data_list.pop(0)
+
+        # Create a list with only necessary data
+        field_compare_list = []
+        for row in field_data_list:
+            to_add = []
+            # Add id column
+            to_add.append(row[id_field_db])
+            # Add any other columns
+            for index in field_indexes_db:
+                to_add.append(row[index])
+            field_compare_list.append(to_add)
+
         # Make list of new fields
         new_fields = ["""RchID"""]
         for new_field in old_new_fields_initial:
-            # make sure the field can fit into an arcmap field
-            # This is where PNET data will go
-            new_fields.append("pnet_" + new_field[:5])
-            # This is where field database data will go
-            new_fields.append("fld_" + new_field[:5])
-            # This is where actual difference data will go
-            new_fields.append("dif_" + new_field[:5])
-            # This is where percent difference data will go
-            new_fields.append("pdif_" + new_field[:5])
-            # This is where ratio data will go
-            new_fields.append("rtio_" + new_field[:5])
+            if old_new_fields_initial.index(new_field) not in missing_field_indexes:
+                # make sure the field can fit into an arcmap field
+                # This is where PNET data will go
+                new_fields.append("pnet_" + new_field[:5])
+                # This is where field database data will go
+                new_fields.append("fld_" + new_field[:5])
+                # This is where actual difference data will go
+                new_fields.append("dif_" + new_field[:5])
+                # This is where percent difference data will go
+                new_fields.append("pdif_" + new_field[:5])
+                # This is where ratio data will go
+                new_fields.append("rtio_" + new_field[:5])
 
 
         # Perform data comparisons
@@ -170,13 +177,19 @@ def main():
                     new_row.append(pnet_num-field_num)
 
                     # Add percent difference field
-                    if pnet_num > field_num:
-                        new_row.append((pnet_num-field_num)/pnet_num)
-                    else:
-                        new_row.append((field_num-pnet_num)/field_num)
+                    if field_num > 0 or field_num < 0:
+                        if pnet_num > field_num:
+                            new_row.append((pnet_num-field_num)/pnet_num)
+                        else:
+                            new_row.append((field_num-pnet_num)/field_num)
 
-                    # Add ratio field
-                    new_row.append(float(pnet_num/field_num))
+                        # Add ratio field
+                        new_row.append(float(pnet_num/field_num))
+                    else:
+                        new_row.append(0.0)
+                        new_row.append(0.0)
+                        new_row.append(0.0)
+
 
                 else:
                     new_row += [0, 0, 0, 0, 0]
@@ -189,8 +202,9 @@ def main():
             # Add data from each PNET field
             data_to_add = []
             for add_field in keep_fields:
-                this_index = pnet_data_list[0].index(add_field)
-                data_to_add.append(pnet_data_list[row_num][this_index])
+                if add_field in pnet_data_list[0]:
+                    this_index = pnet_data_list[0].index(add_field)
+                    data_to_add.append(pnet_data_list[row_num][this_index])
             both_compare_list[row_num] = data_to_add + row
 
 
@@ -275,17 +289,6 @@ def create_plots(comparison_points, pnet_plot_fields, field_plot_fields, field_n
             fig.add_axes()
             ax = fig.add_subplot(111)
 
-            if field_name == 'Conifer_Proportion':
-                x = x*100
-            if field_name == 'Devegetation_Proportion':
-                x = x*100
-            if field_name == 'G_Invasive_Proportion':
-                x = x*100
-            if field_name == 'R_Invasive_Proportion':
-                x = x*100
-            if field_name == 'X_Invasive_Proportion':
-                x = x*100
-
             # set axis range
 
             new_min = min([min(x), min(y)])
@@ -298,8 +301,8 @@ def create_plots(comparison_points, pnet_plot_fields, field_plot_fields, field_n
             plt.setp(ax.get_xticklabels(), rotation=90, horizontalalignment='right')
             a = math.floor((math.log10(range / 10))*-1)
             increment = round(range, int(a)) / 10
-            plt.xticks(np.arange(min(x)-buffer, max(x)+buffer, step=increment))
-            plt.yticks(np.arange(min(y)-buffer, max(y)+buffer, step=increment))
+            plt.xticks(np.arange(0, max(x) + buffer, step=increment))
+            plt.yticks(np.arange(0, max(y) + buffer, step=increment))
 
             # plot data points, regression line, 1:1 reference
 
@@ -312,8 +315,6 @@ def create_plots(comparison_points, pnet_plot_fields, field_plot_fields, field_n
                        xlabel='PNET\n Regression = {}x + {}\n n = {}'.format(round(slope,2), round(intercept,2), len(x)),
                        ylabel='Field Measured')
 
-                # add legend
-                #legend = plt.legend(loc="upper left", bbox_to_anchor=(1,1))
                 # save plot
                 plot_name = os.path.join(out_folder, "{}_Plot.png".format(field_name))
                 plt.savefig(plot_name, bbox_inches='tight')
@@ -326,16 +327,16 @@ def clean_values(output_points, pnet_field, field_db_field):
     x = arcpy.da.FeatureClassToNumPyArray(output_points, [pnet_field]).astype(np.float)
     y = arcpy.da.FeatureClassToNumPyArray(output_points, [field_db_field]).astype(np.float)
 
-    # pull out observed values of zero
-    x1 = x[np.nonzero(x)]
-    y1 = y[np.nonzero(x)]
+    # Remove negatives and zeros
+    keep_x = np.where(x > 0.0)
+    x = x[keep_x]
+    y = y[keep_x]
 
-    if ignore_neg:
-        x2 = x1[x1 >= 0]
-        y2 = y1[x1 >= 0]
-        return x2, y2
+    keep_y = np.where(y > 0.0)
+    x = x[keep_y]
+    y = y[keep_y]
 
-    return x1, y1
+    return x, y
 
 
 def plot_points(x, y, axis):
@@ -345,22 +346,37 @@ def plot_points(x, y, axis):
 
 def plot_regression(x, y, axis, new_max):
 
-    # calculate regression equation of e_DamCt ~ mCC_EX_CT and assign to variable
+    # calculate regression
     regression = stat.linregress(x, y)
-    #model_x = np.arange(0.0, round(max(x))+2, 0.1)
     model_x = np.arange(0.0, new_max, new_max/10000)
     model_y = regression.slope * model_x + regression.intercept
     # plot regression line
     axis.plot(model_x, model_y,  color='black', linewidth=2.0, linestyle='-', label='Regression line')
     # calculate prediction intervals and plot as shaded areas
     n = len(x)
-    error = stat.t.ppf(1-0.025, n-2) * regression.stderr
-    upper_ci = model_y + error
-    lower_ci = model_y - error
-    #axis.fill_between(model_x, y1=upper_ci, y2=lower_ci, facecolor='red', alpha=0.3, label="95% Confidence Interval")
-    # in-plot legend
-    #axis.legend(loc='best', frameon=False)
+
     return regression.rvalue**2, regression.slope, regression.intercept
+
+
+def is_csv(file):
+    return file.endswith('.csv')
+
+
+def read_field_csv(file):
+
+    input_field_list = csv_to_list(file)
+
+    # remove headers
+    input_field_list.pop(0)
+
+    list_a, list_b, list_c = [], [], []
+
+    for unique_field in input_field_list:
+        list_a.append(unique_field[0])
+        list_b.append(unique_field[1])
+        list_c.append(unique_field[2])
+
+    return list_a, list_b, list_c
 
 
 if __name__ == "__main__":
