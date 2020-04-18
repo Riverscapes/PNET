@@ -57,7 +57,6 @@ def main():
         old_field_db_fields = field_db_fields
         old_new_fields_initial = new_fields_initial
 
-
         arcpy.AddMessage("Working on {}...".format(watershed))
 
         # Setup watershed data
