@@ -1,0 +1,12 @@
+﻿PNET Field,PIBO Field,New Name,From
+BFWIDTH,Bf,Bankfull_Width,Bankfull
+iGeo_Slope,Grad_Per,Slope,BRAT
+Sinuosity,Sin,Sinuosity,Sinuosity
+PredD50_03,D50,03_D50,PNET
+PredD50_04,D50_2,04_D50,PNET
+FldRchLen,RchLen,Reach_Length,PNET
+prop_deveg,GLcvrTotal,Devegetation_Proportion,RVD
+prop_inv,GL_RAC,G_Invasive_Proportion,RVD
+prop_inv,XS_RAC,X_Invasive_Proportion,RVD
+prop_inv,RchCvrIntr,R_Invasive_Proportion,RVD
+prop_conif,GLwoodycvr,Conifer_Proportion,RVD
