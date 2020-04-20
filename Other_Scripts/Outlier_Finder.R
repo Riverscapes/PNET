@@ -5,11 +5,12 @@ library(MASS)
 rm(list = ls())
 
 # Set working Directory
-setwd("C:\Users\Tyler\Desktop\Work\Git\PNET\Outlier_Script")
+setwd("C:\\Users\\Tyler\\Desktop\\Work\\Test_Run\\00_Scripttesting")
 
 # Add in data from PNET output
-all_data = read.csv("Data_Template.csv")
-fields =read.csv("Fields_Template.csv", fileEncoding="UTF-8-BOM")
+all_data = read.csv("All_Data.csv")
+fields =read.csv("R_Fields_Template.csv", fileEncoding="UTF-8-BOM")
+export_list = list()
 
 for (row in 1:nrow(fields)){
   pnet_field = lapply((fields[row, "pnet"]), as.character)[[1]]
@@ -23,10 +24,16 @@ for (row in 1:nrow(fields)){
   new_data = cbind(analysis, fit_res_df)
   outliers = new_data[abs(new_data$fit_res) > 2,]
   outlier_id = outliers$RchID
-  outlier_id
   message(paste(new_name, "Outliers"))
   for (reach in outlier_id){
     message(paste("\"RchID\" = ", reach, " OR"))
   }
   
+  export_list[[pnet_field]] = outlier_id
+  export_list[[pibo_field]] = outlier_id
+  
+  write.table(export_list[pnet_field], 'Outliers.csv'  , append= T, sep=',' )
+  write.table(export_list[pibo_field], 'Outliers.csv'  , append= T, sep=',' )
 }
+
+
