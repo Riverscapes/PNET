@@ -2,6 +2,7 @@ import arcpy
 import os
 import shutil
 import csv
+import time
 
 # -------------------------------------------------------------------------------
 # Name:        PNET_Functions
@@ -12,6 +13,35 @@ import csv
 # Created:     2/9/2020
 # Latest Update: 2/9/2020
 # -------------------------------------------------------------------------------
+
+
+def start ():
+    arcpy.env.overwriteOutput = True
+    return time.time()
+
+
+def update (watershed, watershed_list, start_time):
+
+    total = len(watershed_list)
+    this_one = watershed_list.index(watershed)
+
+    curr_time = time.time()
+    time_elapsed = curr_time-start_time
+    if this_one > 0:
+        time_per_watershed = time_elapsed/this_one
+        watersheds_left = total-this_one
+        time_left = time_per_watershed * watersheds_left
+        projectwide_estimate = time_per_watershed * 2
+        estimate = time_left + projectwide_estimate
+        estimate = int(estimate/60)
+    else:
+        estimate = "?"
+
+    arcpy.AddMessage("\nStarting {}({}/{})... [Time Remaining Estimate: {} Minutes]".format(watershed, this_one+1, total, estimate))
+
+
+def update_pw ():
+    arcpy.AddMessage("\nStarting Projectwide...")
 
 
 def parse_bool(parameter):
@@ -231,4 +261,4 @@ def csv_to_list(csv_to_read):
 
 
 def finish():
-    print "\n---Finished!---"
+    arcpy.AddMessage("\n---Finished!---")
