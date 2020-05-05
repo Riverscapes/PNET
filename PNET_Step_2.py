@@ -8,7 +8,7 @@ from PNET_Functions import is_even, get_watershed_folders, delete_old, finish, p
 # Author:      Tyler Hatch
 #
 # Created:     09/23/2019
-# Latest Update: 2/9/2020
+# Latest Update: 5/4/2020
 # -------------------------------------------------------------------------------
 
 # A list of file locations pointing to each watershed's All_points folder
