@@ -13,7 +13,7 @@ The ninth step in PNET is to make numerical comparisons between the field databa
 
 - **Field Database**
 
-  - A CSV containing all data collected in the field. THis csv must have a [RchID] field
+  - A CSV containing all data collected in the field. This csv must have a [RchID] field
 
 - **Fields List**
 

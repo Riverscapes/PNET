@@ -14,11 +14,11 @@ from PNET_Functions import get_watershed_folders, delete_old, create_csv,\
 # -------------------------------------------------------------------------------
 
 # The folder containing all watershed folders
-root_folder = r'C:\Users\Tyler\Desktop\Work\FullRun'
+root_folder = r''
 # The csv containing all field aquired data
-field_db = r'C:\Users\Tyler\Desktop\Work\PIBO_Master.csv'
+field_db = r''
 # CSV to set field data from
-input_field_csv = r'C:\Users\Tyler\Desktop\Work\PNET_Fields_Master.csv'
+input_field_csv = r''
 
 
 

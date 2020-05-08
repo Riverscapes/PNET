@@ -8,7 +8,7 @@ The third step in PNET is to prepare the field points for the reach editing step
 - **Project Folder**
   - This is the folder that contains all data for the project. Folders with the prefix "00_" will be ignored.
 - **Were Unsnapped Points Fixed?**
-  - Check this if you manually edited unsnapped points to be snapped in the step before this. Those manually edited points will be reincorporated into the project.
+  - Check this if you manually edited unsnapped points to be snapped in the step before this. Those manually edited points will be reincorporated into the project. (More info on this in "Other Steps and Scripts")
 
 Before this step the user may edit all of the unsnapped points found in 00_ProjectWide\Intermediates\Points\Unsnapped_Fixed so that they are snapped to the network. This step is optional, and is detailed more in a later portion of this text. If the user did edit these points, set the “Were Unsnapped Points Fixed” parameter to true. If the user decides to skip this step, set the parameter to false. 
 
