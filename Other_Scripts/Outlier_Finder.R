@@ -7,9 +7,9 @@ rm(list = ls())
       # THIS IS THE ONLY PART YOU NEED TO EDIT
 
       # Put your project_folder here (Make sure to do double slashes like this: \\)
-      project_folder = "C:\\Users\\Tyler\\Desktop\\Work\\FullRun"
+      project_folder = ""
       # Put your comparison fields csv here (Make sure to do double slashes like this: \\)
-      field_info_csv = "C:\\Users\\Tyler\\Desktop\\Work\\PNET_Fields_Master.csv"
+      field_info_csv = ""
       # Cook Values above this number wil be considered outliers
       cook_threshold = 1
 
