@@ -7,9 +7,9 @@ The seventh step in PNET is to extract data from data networks onto the field po
 
 
 
-- Project Folder
+- **Project Folder**
   - This is the folder that contains all data for the project. Folders with the prefix "00_" will be ignored.
-- Length Cutoff
+- **Length Cutoff**
   - All segments below this length in meters will not be considered when calculating weighted averages for multi segment reaches.
 
 

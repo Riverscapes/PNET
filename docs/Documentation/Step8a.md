@@ -7,7 +7,7 @@ The eighth step in PNET is to collect all extracted field reaches and merge them
 
 
 
-- Project Folder
+- **Project Folder**
 
   - This is the folder that contains all data for the project. Folders with the prefix "00_" will be ignored.
 

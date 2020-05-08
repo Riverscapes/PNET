@@ -5,11 +5,11 @@ weight: 9
 
 Before this step is run, you  need to run the Outlier Finder script in R. This will identify outliers and save a list of outliers that this tool can understand. This tool simply removes those outliers
 
-- Project Folder
+- **Project Folder**
   
-- This is the folder that contains all data for the project. Folders with the prefix "00_" will be ignored.
+  - This is the folder that contains all data for the project. Folders with the prefix "00_" will be ignored.
   
-- Fields List
+- **Fields List**
 
   - A CSV with data about what comparisons need to be performed. More detail can be found in the "Other" section
 

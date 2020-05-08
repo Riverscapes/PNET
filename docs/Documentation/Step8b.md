@@ -7,7 +7,7 @@ This opional step allows D50 estimations to be calculated based on data from inp
 
 
 
-- Project Folder
+- **Project Folder**
 
   - This is the folder that contains all data for the project. Folders with the prefix "00_" will be ignored.
 
