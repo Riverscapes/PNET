@@ -71,7 +71,7 @@ def main():
         arcpy.Clip_analysis(tor_points, clipped_watershed, tor_temp_location)
 
         # Only save one point per reach and site
-        year_dif_field = create_year_distance(tor_temp_location, "yr")
+        year_dif_field = create_year_distance(tor_temp_location, "yr", data_year)
         delete_identical(tor_temp_location, "SiteID", year_dif_field, "RchID", tor_save_location)
         to_merge_tor.append(tor_save_location)
 
@@ -166,11 +166,11 @@ def make_structure(main_folder, watershed_name):
     return watershed_folder
 
 
-def create_year_distance(shapefile, year_field):
+def create_year_distance(shapefile, year_field, data_year):
     # Creates a field showing how far away (timewise) the reach is from our target year
     new_field = "Year_Dif"
     arcpy.AddField_management(shapefile, new_field, "SHORT")
-    arcpy.CalculateField_management(shapefile, new_field, "abs(2016 - !{}!)".format(year_field),"PYTHON_9.3", "")
+    arcpy.CalculateField_management(shapefile, new_field, "abs({} - !{}!)".format(data_year, year_field),"PYTHON_9.3", "")
     return new_field
 
 

@@ -18,7 +18,7 @@ use_threshold = parse_bool(arcpy.GetParameterAsText(1))
 # The longest distance (m) to go before snapping stops and remaining points are considered outliers to be investigated
 threshold_range = int(arcpy.GetParameterAsText(2))
 # Snapping distances will increase by this increment (m). Default is ten. Lower values mean longer run time.
-custom_increment = int(arcpy.GetParameterAsText(3))
+custom_increment = 10
 
 
 def main():
