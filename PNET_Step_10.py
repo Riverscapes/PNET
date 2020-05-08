@@ -49,14 +49,14 @@ def main():
 
         meta_group_field = graph[0]
         meta_group_field_name = graph[1]
+        group_field = graph[2]
+        group_field_name = graph[3]
+        field_db_fields = graph[4]
+
         if meta_group_field and group_field_name:
             meta_exists = True
         else:
             meta_exists = False
-
-        group_field = graph[2]
-        group_field_name = graph[3]
-        field_db_fields = graph[4]
 
         for watershed in watershed_folders:
 
