@@ -34,7 +34,9 @@ def main():
     projectwide_database = os.path.join(root_folder, "00_ProjectWide", "Inputs", "Database", "Field_Database.csv")
     delete_old(projectwide_output)
 
-    keep_fields = ["FID", "Shape", "POINT_X", "POINT_Y", "SnapDist", "FldRchLen","EcoRgn_L4" ,"EcoRgn_L3" ,"HUC8" ,"NAME" ,"StreamName"]
+    keep_fields = ["FID", "Shape", "POINT_X", "POINT_Y", "SnapDist", "FldRchLen",
+                   "EcoRgn_L4", "EcoRgn_L3", "HUC8", "NAME", "StreamName",
+                   "PRECIP", "DRAREA", "iGeo_ElMax", "iGeo_ElMin"]
 
     to_merge = []
 
@@ -47,6 +49,11 @@ def main():
 
         meta_group_field = graph[0]
         meta_group_field_name = graph[1]
+        if meta_group_field and group_field_name:
+            meta_exists = True
+        else:
+            meta_exists = False
+
         group_field = graph[2]
         group_field_name = graph[3]
         field_db_fields = graph[4]
@@ -94,11 +101,14 @@ def main():
 
             # Find certain PNET indexes in the PNET output
             id_pnet = pnet_data_list[0].index("""RchID""")
-            if group_field not in pnet_data_list[0] or meta_group_field not in pnet_data_list[0]:
-                arcpy.AddMessage("Could not complete plots for {}, could not find {} field or {} field".format(watershed, group_field, meta_group_field))
+            if group_field not in pnet_data_list[0]:
+                arcpy.AddMessage("Could not complete plots for {}, could not find {} field".format(watershed, group_field))
+            elif meta_exists and meta_group_field not in pnet_data_list[0]:
+                arcpy.AddMessage("Could not complete plots for {}, could not find {} field".format(watershed, meta_group_field))
             else:
                 group_pnet = pnet_data_list[0].index(group_field)
-                meta_group_pnet = pnet_data_list[0].index(meta_group_field)
+                if meta_exists:
+                    meta_group_pnet = pnet_data_list[0].index(meta_group_field)
 
                 # remove headers
                 pnet_data_list.pop(0)
@@ -111,12 +121,17 @@ def main():
                     to_add.append(row[id_pnet])
                     # Add grouping columns
                     to_add.append(row[group_pnet])
-                    to_add.append(row[meta_group_pnet])
+                    if meta_exists:
+                        to_add.append(row[meta_group_pnet])
                     # Add this row to the overall list
                     pnet_compare_list.append(to_add)
 
                 # Make list of new fields
-                new_fields = ["""RchID""", meta_group_field_name, group_field_name]
+                if meta_exists:
+                    new_fields = ["""RchID""", meta_group_field_name, group_field_name]
+                else:
+                    new_fields = ["""RchID""", group_field_name]
+
                 for new_field in field_db_fields:
                     # This is where field data will go
                     new_fields.append("Y_" + new_field[:7])
@@ -138,10 +153,11 @@ def main():
 
                     # Add the reach ID to our new row
                     new_row.append(pnet_row[0])
-                    # Add the metagroup to our new row
+                    # Add the group/metagroup field to our new row
                     new_row.append(pnet_row[1])
-                    # Add the group to our new row
-                    new_row.append(pnet_row[2])
+                    if meta_exists:
+                        # Add the metagroup to our new row
+                        new_row.append(pnet_row[2])
 
                     # Prepare to iterate through each column of data, skipping rchID
                     field_iter = iter(field_row)
@@ -212,27 +228,42 @@ def main():
                 create_csv(os.path.join(watershed_output, "Categorical_Comparison_Data.csv"), comparison_points)
 
                 # Get a list of all the different metagroup types
-                metagroup_types = unique_values(comparison_points, meta_group_field_name[:10])
+                if meta_exists:
 
-                # Make a folder, shapefile, and plots for every metagroup
-                if " " in metagroup_types:
-                    metagroup_types.remove(" ")
+                    metagroup_types = unique_values(comparison_points, meta_group_field_name[:10])
 
-                for metagroup in metagroup_types:
+                    # Make a folder, shapefile, and plots for every metagroup
+                    if " " in metagroup_types:
+                        metagroup_types.remove(" ")
 
-                    # Create a new folder for only data in this meta group
-                    plot_folder = make_folder(watershed_output, "{}_{}".format(meta_group_field_name.title(), metagroup.title()))
+                    for metagroup in metagroup_types:
+
+                        # Create a new folder for only data in this meta group
+                        plot_folder = make_folder(watershed_output, "{}_{}".format(meta_group_field_name.title(), metagroup.title()))
+
+                        # Create a shapefile with only data we want to look at
+                        layer_name = 'temp'
+                        new_shapefile = os.path.join(plot_folder, '{}_{}_Comparison.shp'.format(meta_group_field_name.title(), metagroup.title()))
+                        arcpy.MakeFeatureLayer_management(comparison_points, layer_name)
+                        query = '{} = \'{}\''.format(meta_group_field_name[:10], metagroup)
+                        arcpy.SelectLayerByAttribute_management(layer_name, 'NEW_SELECTION', query)
+                        arcpy.CopyFeatures_management(layer_name, new_shapefile)
+
+                        # Create plots for this data
+                        create_plots(new_shapefile, group_field_name, field_db_fields, plot_folder, metagroup, meta_group_field_name)
+                else:
+
+                    plot_folder = make_folder(watershed_output, "{}".format(group_field_name.title()))
 
                     # Create a shapefile with only data we want to look at
                     layer_name = 'temp'
-                    new_shapefile = os.path.join(plot_folder, '{}_{}_Comparison.shp'.format(meta_group_field_name.title(), metagroup.title()))
+                    new_shapefile = os.path.join(plot_folder, '{}_Comparison.shp'.format(group_field_name.title()))
                     arcpy.MakeFeatureLayer_management(comparison_points, layer_name)
-                    query = '{} = \'{}\''.format(meta_group_field_name[:10], metagroup)
-                    arcpy.SelectLayerByAttribute_management(layer_name, 'NEW_SELECTION', query)
                     arcpy.CopyFeatures_management(layer_name, new_shapefile)
 
                     # Create plots for this data
-                    create_plots(new_shapefile, group_field_name, field_db_fields, plot_folder, metagroup, meta_group_field_name)
+                    create_plots(new_shapefile, group_field_name, field_db_fields, plot_folder, metagroup,
+                                 meta_group_field_name)
 
 
         # Do projectwide
@@ -240,31 +271,47 @@ def main():
         merged = arcpy.Merge_management(to_merge, os.path.join(projectwide_output, "Categorical_Comparison_Points.shp"))
         create_csv(os.path.join(projectwide_output, "Categorical_Comparison_Data.csv"), merged)
 
-        # Get a list of all the different metagroup types
-        metagroup_types = unique_values(merged, meta_group_field_name[:10])
+        if meta_exists:
 
-        # Make a folder, shapefile, and plots for every metagroup
-        if " " in metagroup_types:
-            metagroup_types.remove(" ")
+            # Get a list of all the different metagroup types
+            metagroup_types = unique_values(merged, meta_group_field_name[:10])
 
-        for metagroup in metagroup_types:
-            # Create a new folder for only data in this meta group
-            plot_folder = make_folder(projectwide_output, "{}_{}".format(meta_group_field_name.title(), metagroup.title()))
+            # Make a folder, shapefile, and plots for every metagroup
+            if " " in metagroup_types:
+                metagroup_types.remove(" ")
+
+            for metagroup in metagroup_types:
+                # Create a new folder for only data in this meta group
+                plot_folder = make_folder(projectwide_output, "{}_{}".format(meta_group_field_name.title(), metagroup.title()))
+
+                # Create a shapefile with only data we want to look at
+                layer_name = 'temp'
+                new_shapefile = os.path.join(plot_folder,
+                                             '{}_{}_Comparison.shp'.format(meta_group_field_name.title(), metagroup.title()))
+                arcpy.MakeFeatureLayer_management(merged, layer_name)
+                query = '{} = \'{}\''.format(meta_group_field_name[:10], metagroup)
+                arcpy.SelectLayerByAttribute_management(layer_name, 'NEW_SELECTION', query)
+                arcpy.CopyFeatures_management(layer_name, new_shapefile)
+
+                # Create plots for this data
+                create_plots(new_shapefile, group_field_name, field_db_fields, plot_folder, metagroup, meta_group_field_name)
+
+        else:
+
+            plot_folder = make_folder(projectwide_output, "{}".format(group_field_name.title()))
 
             # Create a shapefile with only data we want to look at
             layer_name = 'temp'
-            new_shapefile = os.path.join(plot_folder,
-                                         '{}_{}_Comparison.shp'.format(meta_group_field_name.title(), metagroup.title()))
+            new_shapefile = os.path.join(plot_folder, '{}_Comparison.shp'.format(group_field_name.title()))
             arcpy.MakeFeatureLayer_management(merged, layer_name)
-            query = '{} = \'{}\''.format(meta_group_field_name[:10], metagroup)
-            arcpy.SelectLayerByAttribute_management(layer_name, 'NEW_SELECTION', query)
             arcpy.CopyFeatures_management(layer_name, new_shapefile)
 
             # Create plots for this data
-            create_plots(new_shapefile, group_field_name, field_db_fields, plot_folder, metagroup, meta_group_field_name)
+            create_plots(new_shapefile, group_field_name, field_db_fields, plot_folder, metagroup,
+                         meta_group_field_name)
 
 
-def create_plots(data_shapefile, group_field, y_axis_fields, out_folder, metagroup, metagroup_name):
+def create_plots(data_shapefile, group_field, y_axis_fields, out_folder, metagroup = "", metagroup_name = ""):
 
     for y_axis_field in y_axis_fields:
         labels, all_data = get_data(data_shapefile, group_field, y_axis_field)
@@ -280,9 +327,12 @@ def create_plots(data_shapefile, group_field, y_axis_fields, out_folder, metagro
         bplot = ax.boxplot(all_data,
                            vert=True,  # vertical box alignment
                            labels=new_labels)  # will be used to label x-ticks
-
-        ax.set_title('{} field values for all {} groups\n [When {} = {}]'
-                      .format(y_axis_field.title(), group_field.title(), metagroup_name.title(), metagroup.title()))
+        if metagroup != "":
+            ax.set_title('{} PIBO values for all {} groups\n [When {} = {}]'
+                          .format(y_axis_field.title(), group_field.title(), metagroup_name.title(), metagroup.title()))
+        else:
+            ax.set_title('{} PIBO values for all {} groups'
+                          .format(y_axis_field.title(), group_field.title()))
 
         ax.yaxis.grid(True)
         ax.set_xlabel('{} Category'.format(group_field.title()))
@@ -379,7 +429,7 @@ def read_field_csv_new(file):
 
         if len(row[2]) > 1:
             if end_graph:
-                graphs.append(meta, meta_name, group, group_name, fields)
+                graphs.append([meta, meta_name, group, group_name, fields])
 
             # Start a new graph
             meta = row[0]
@@ -393,7 +443,7 @@ def read_field_csv_new(file):
             fields.append(row[4])
 
     # Add final row
-    graphs.append(meta, meta_name, group, group_name, fields)
+    graphs.append([meta, meta_name, group, group_name, fields])
 
     return graphs
 
