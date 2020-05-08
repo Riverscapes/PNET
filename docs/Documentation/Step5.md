@@ -1,12 +1,11 @@
 ---
-title: Step 4
-weight: 4
+title: Step 5
+weight: 5
 ---
 
-The fourth step in PNET is to create field reaches based on field points and the stream network. The inputs for this tool are:
+The fifth step in PNET is to clean up the field points and reaches.
 
-- Root Folder
+- Project Folder
+  - This is the folder that contains all data for the project. Folders with the prefix "00_" will be ignored.
 
-  To create field reaches, this tool looks at every stream network segment that touches a field point. It is important to note that as this point the stream network segments were created by splitting the stream network at each field point. A simple process is performed to determine which segments are field reaches, and which ones need to be deleted.
-
-If the segment is not touching exactly two points (one TOR and one BOR from the same site), it is removed. Then, all field points that are touching field reaches are saved to the Reach Editing folder, along with the field reaches.
+This tool is rather simple. It takes the outputs from step 4, and cleans them up. First, a field called “FldRchLen” is added. This field contains the length of the field reach that was generated in step 4. Next, all TOR field points are deleted, leaving only the BOR points. This is done as having two points now is superfluous. After that, we make sure that all points share all the data present on the corresponding field reach, and vice versa. Finally, all fields not pertaining to PNET analysis are removed.

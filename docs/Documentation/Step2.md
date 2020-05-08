@@ -5,13 +5,13 @@ weight: 2
 
 The second step in PNET is to take all field points and snap them to the stream network. The inputs for this tool are:
 
-
-
-- Root Folder
-- A boolean that, if true, will stop snapping points after a certain distance. This is on by default, as points far enough away should be manually looked at.
--  A distance in meters that determines the aforementioned threshold. Default is 50m.
-
-
+- Project Folder
+  - This is the folder that contains all data for the project. Folders with the prefix "00_" will be ignored.
+- Use Threshold?
+  - True: Points will stop trying to snap after a certain distance. Use this if you want to make sure points aren't snapping from too far away. This also makes the tool run faster
+  - False: Use this if you want all points to snap to the network regardless of distance. Only use this if you have extreme confidence that all of your points are valid and close to the network. 
+- Threshold Range
+  -  A distance in meters that determines the aforementioned threshold. 
 
 To begin, the tool retrieves stream networks for each watershed, and saves them into their appropriate folder. Another field is added to denote at what snapping distance the field point snapped. If the point is not snapped, a value of 999 is given.
 

@@ -7,12 +7,14 @@ The seventh step in PNET is to extract data from data networks onto the field po
 
 
 
-- Root Folder
-- A length cutoff. All segments below this length in meters will not be considered when calculating weighted averages for multi segment reaches.
+- Project Folder
+  - This is the folder that contains all data for the project. Folders with the prefix "00_" will be ignored.
+- Length Cutoff
+  - All segments below this length in meters will not be considered when calculating weighted averages for multi segment reaches.
 
 
 
-  This step is the longest, and also most important step in PNET. All of the calculations happen once per data network, per watershed. The first action is to clip the data network by the field reaches. Now we have data reaches that are exactly as long as the field reaches. The data reaches are still segmented. The fact that the data reaches are segmented is important for data extraction. A field is added to each data network segment that indicates how long that segment is. The length of each clipped segment relative to the total length of the field reach is used as the weight for the weighted average later.
+This step is crucial to PNET. All of the calculations happen once per data network, per watershed. The first action is to clip the data network by the field reaches. Now we have data reaches that are exactly as long as the field reaches. The data reaches are still segmented. The fact that the data reaches are segmented is important for data extraction. A field is added to each data network segment that indicates how long that segment is. The length of each clipped segment relative to the total length of the field reach is used as the weight for the weighted average later.
 
   Extracting data network data to points is easy. A spatial join is performed on the points and data network, and the point adopts the data of whatever data network segment was closest to it. Some unnecessary fields are removed from the field points, then they are all saved into the appropriate folder. One output is saved per data network per watershed. 
 
