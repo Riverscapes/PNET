@@ -31,18 +31,26 @@ def make_folder(path_to_location, new_folder_name):
     return new_folder
 
 
-def delete_old(folder_to_clear):
+def delete_old(folder_to_clear, delete_type=False):
     # Clears an individual folder of all its data
     if os.path.exists(folder_to_clear):
 
         folder = folder_to_clear
         for the_file in os.listdir(folder):
             file_path = os.path.join(folder, the_file)
-            try:
-                if os.path.isfile(file_path):
-                    os.unlink(file_path)
-            except Exception as e:
-                print(e)
+            if delete_type:
+                if file_path.endswith(delete_type):
+                    try:
+                        if os.path.isfile(file_path):
+                            os.unlink(file_path)
+                    except Exception as e:
+                        print(e)
+            else:
+                try:
+                    if os.path.isfile(file_path):
+                        os.unlink(file_path)
+                except Exception as e:
+                    print(e)
 
 
 def delete_temps(temps_to_delete):

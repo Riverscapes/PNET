@@ -18,56 +18,46 @@ import math
 # Latest Update: 3/1/2020
 # -------------------------------------------------------------------------------
 
-# The projectwide all_data shapefile
-all_data_shapefile = r'C:\Users\Tyler\Desktop\Work\Test_Run\00_ProjectWide\Outputs\Comparisons\Numerical\Numerical_Comparison_Points.shp'
-# Outliers CSV
-outliers_csv = r'C:\Users\Tyler\Desktop\Work\Test_Run\00_Scripttesting\Outliers.csv'
+# The folder containing all watershed folders
+root_folder = arcpy.GetParameterAsText(0)
 
 
 def main():
 
+    outliers_csv = os.path.join(root_folder, "00_Projectwide", "Outputs", "Comparisons", "Numerical", "Outliers.csv")
+
+    if not os.path.isfile(outliers_csv):
+        arcpy.AddMessage("Please run the Outliers R script before this script")
+
     # Initialize variables and file locations
     arcpy.env.overwriteOutput = True
-
+    watershed_folders = get_watershed_folders(root_folder)
+    watershed_folders.append(os.path.join(root_folder, "00_Projectwide"))
     fields, outliers = read_outliers_csv(outliers_csv)
 
-    for field, outlier_reach in zip(fields, outliers):
-        with arcpy.da.UpdateCursor(all_data_shapefile, ["RchID", field]) as cursor:
-            for row in cursor:
-                # If the current reach ID is in the list of outlier reaches
-                if row[0] in outlier_reach:
-                    row[1] = 0.0
-                cursor.updateRow(row)
+    for watershed in watershed_folders:
+
+        arcpy.AddMessage("Working on {}...".format(watershed))
+
+        output_location = os.path.join(watershed, "Outputs", "Comparisons", "Numerical")
+        shapefile_in = os.path.join(output_location, "Numerical_Comparison_Points.shp")
+        shapefile_out = os.path.join(output_location, "Numerical_Comparison_Points_Outliers_Removed.shp")
+        arcpy.Copy_management(shapefile_in, shapefile_out)
+        csv = os.path.join(output_location, "Numerical_Comparison_Data_Outliers_Removed.csv")
+        for field, outlier_reach in zip(fields, outliers):
+            if field in get_fields(shapefile_out):
+                arcpy.AddMessage("\tFixing Field {}...".format(field))
+                with arcpy.da.UpdateCursor(shapefile_out, ["RchID", field]) as cursor:
+                    for row in cursor:
+                        # If the current reach ID is in the list of outlier reaches
+                        if row[0] in outlier_reach:
+                            row[1] = -999
+                        cursor.updateRow(row)
+
+        create_csv(csv, shapefile_out)
 
 
-def read_outliers_csv(to_read):
 
-    to_read_list = csv_to_list(to_read)
-    fields = []
-    outliers = []
-    curr_outliers = []
-
-    for row in to_read_list:
-
-        # This represents a new field
-        if len(row) == 1:
-            fields.append(row[0])
-            outliers.append(curr_outliers)
-            curr_outliers = []
-
-        # We are reading in outliers
-        else:
-            # Use row[1] to skip over id field
-            curr_outliers.append(row[1])
-
-    # Remove blank first entry
-    outliers.pop(0)
-
-    # Add in final outliers
-    outliers.append(curr_outliers)
-
-
-    return fields, outliers
 
 
 
