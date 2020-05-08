@@ -21,8 +21,6 @@ import math
 root_folder = arcpy.GetParameterAsText(0)
 # The folder containing all watershed folders
 input_field_csv = arcpy.GetParameterAsText(1)
-# Were outliers removed in the previous step?
-outliers_removed = arcpy.GetParameterAsText(2)
 
 
 def main():
@@ -41,12 +39,8 @@ def main():
         delete_old(out_folder, '.png')
         data_csv = os.path.join(in_folder, "Numerical_Comparison_Data.csv")
 
-        if outliers_removed:
-            outliers_csv = os.path.join(root_folder, "00_Projectwide", "Outputs", "Comparisons", "Numerical",
-                                        "Outliers.csv")
-            outlier_fields, outlier_reaches_list = read_outliers_csv(outliers_csv)
-        else:
-            outliers_csv = False
+        outliers_csv = os.path.join(root_folder, "00_Projectwide", "Outputs", "Comparisons", "Numerical", "Outliers.csv")
+        outlier_fields, outlier_reaches_list = read_outliers_csv(outliers_csv)
 
         pnet_names, pnet_fields, field_names, field_db_fields, new_fields_initial, pnet_valid, field_valid = read_field_csv(input_field_csv)
 
