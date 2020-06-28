@@ -38,7 +38,7 @@ def main():
                    "EcoRgn_L4", "EcoRgn_L3", "HUC8", "NAME", "StreamName",
                    "PRECIP", "DRAREA", "iGeo_ElMax", "iGeo_ElMin"]
 
-    to_merge = []
+
 
     #  set the field lists to the values from the file
     # meta_group_field, meta_group_field_name, group_field, group_field_name, field_db_fields = read_field_csv(input_field_csv)
@@ -47,11 +47,15 @@ def main():
 
     for graph in graphs:
 
+        to_merge = []
+
         meta_group_field = graph[0]
         meta_group_field_name = graph[1]
         group_field = graph[2]
         group_field_name = graph[3]
         field_db_fields = graph[4]
+
+        arcpy.AddMessage("Graphing {}...".format(group_field_name))
 
         if meta_group_field and group_field_name:
             meta_exists = True
@@ -60,7 +64,7 @@ def main():
 
         for watershed in watershed_folders:
 
-            arcpy.AddMessage("Working on {}...".format(watershed))
+            arcpy.AddMessage("\tWorking on {}...".format(watershed))
 
             # Setup watershed data
             watershed_output = make_folder(os.path.join(watershed, "Outputs", "Comparisons"), "Categorical")
@@ -120,9 +124,10 @@ def main():
                     # Add id column
                     to_add.append(row[id_pnet])
                     # Add grouping columns
-                    to_add.append(row[group_pnet])
                     if meta_exists:
                         to_add.append(row[meta_group_pnet])
+
+                    to_add.append(row[group_pnet])
                     # Add this row to the overall list
                     pnet_compare_list.append(to_add)
 
@@ -134,7 +139,7 @@ def main():
 
                 for new_field in field_db_fields:
                     # This is where field data will go
-                    new_fields.append("Y_" + new_field[:7])
+                    new_fields.append("Y_" + new_field[:8])
 
                 # Perform data comparisons
 
@@ -210,7 +215,6 @@ def main():
                 iter_list = iter(both_compare_list)
                 next(iter_list)
 
-
                 # remove useless field
                 arcpy.DeleteField_management(comparison_points, "Id")
 
@@ -219,8 +223,8 @@ def main():
                     with arcpy.da.SearchCursor(template, '*') as searcher:
                         for row, search_row in zip(iter_list, searcher):
                             # Steal Shape and FID data from template
-                            row.insert(0, search_row[1])
-                            row.insert(0, search_row[0])
+                            row[0] = search_row[0]
+                            row[1] = search_row[1]
                             # Add in row
                             inserter.insertRow(row)
 
@@ -240,6 +244,7 @@ def main():
 
                         # Create a new folder for only data in this meta group
                         plot_folder = make_folder(watershed_output, "{}_{}".format(meta_group_field_name.title(), metagroup.title()))
+                        delete_old(plot_folder)
 
                         # Create a shapefile with only data we want to look at
                         layer_name = 'temp'
@@ -254,6 +259,7 @@ def main():
                 else:
 
                     plot_folder = make_folder(watershed_output, "{}".format(group_field_name.title()))
+                    delete_old(plot_folder)
 
                     # Create a shapefile with only data we want to look at
                     layer_name = 'temp'
@@ -262,13 +268,15 @@ def main():
                     arcpy.CopyFeatures_management(layer_name, new_shapefile)
 
                     # Create plots for this data
-                    create_plots(new_shapefile, group_field_name, field_db_fields, plot_folder, metagroup,
-                                 meta_group_field_name)
+                    create_plots(new_shapefile, group_field_name, field_db_fields, plot_folder)
+
+                arcpy.Delete_management(new_shapefile)
 
 
         # Do projectwide
-        arcpy.AddMessage('Saving ProjectWide...')
-        merged = arcpy.Merge_management(to_merge, os.path.join(projectwide_output, "Categorical_Comparison_Points.shp"))
+        arcpy.AddMessage('\tSaving ProjectWide...')
+        save_loc = os.path.join(projectwide_output, "Categorical_Comparison_Points_{}.shp".format(group_field_name))
+        merged = arcpy.Merge_management(to_merge, save_loc)
         create_csv(os.path.join(projectwide_output, "Categorical_Comparison_Data.csv"), merged)
 
         if meta_exists:
@@ -283,6 +291,7 @@ def main():
             for metagroup in metagroup_types:
                 # Create a new folder for only data in this meta group
                 plot_folder = make_folder(projectwide_output, "{}_{}".format(meta_group_field_name.title(), metagroup.title()))
+                delete_old(plot_folder)
 
                 # Create a shapefile with only data we want to look at
                 layer_name = 'temp'
@@ -299,6 +308,7 @@ def main():
         else:
 
             plot_folder = make_folder(projectwide_output, "{}".format(group_field_name.title()))
+            delete_old(plot_folder)
 
             # Create a shapefile with only data we want to look at
             layer_name = 'temp'
@@ -307,51 +317,62 @@ def main():
             arcpy.CopyFeatures_management(layer_name, new_shapefile)
 
             # Create plots for this data
-            create_plots(new_shapefile, group_field_name, field_db_fields, plot_folder, metagroup,
-                         meta_group_field_name)
+            create_plots(new_shapefile, group_field_name, field_db_fields, plot_folder)
+
+        arcpy.Delete_management(new_shapefile)
+        arcpy.Delete_management(merged)
 
 
 def create_plots(data_shapefile, group_field, y_axis_fields, out_folder, metagroup = "", metagroup_name = ""):
 
     for y_axis_field in y_axis_fields:
-        labels, all_data = get_data(data_shapefile, group_field, y_axis_field)
-        new_labels = []
-        for entry, label in zip(all_data, labels):
-            n = len(entry)
-            new_label = "[{}] ".format(n) + label
-            new_labels.append(new_label)
+        try:
+            labels, all_data = get_data(data_shapefile, group_field, y_axis_field)
+            new_labels = []
+            for entry, label in zip(all_data, labels):
+                n = len(entry)
+                new_label = "[{}] ".format(n) + label
+                new_labels.append(new_label)
 
-        # set up plot
-        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 9))
+            # set up plot
+            fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 9))
+            bplot = ax.boxplot(all_data,
+                               vert=True,  # vertical box alignment
+                               labels=new_labels)  # will be used to label x-ticks
+            if metagroup != "":
+                ax.set_title('{} values for all {} groups\n [When {} = {}]'
+                              .format(y_axis_field.title(), group_field.title(), metagroup_name.title(), metagroup.title()))
+            else:
+                ax.set_title('{} values for all {} groups'
+                              .format(y_axis_field.title(), group_field.title()))
 
-        bplot = ax.boxplot(all_data,
-                           vert=True,  # vertical box alignment
-                           labels=new_labels)  # will be used to label x-ticks
-        if metagroup != "":
-            ax.set_title('{} PIBO values for all {} groups\n [When {} = {}]'
-                          .format(y_axis_field.title(), group_field.title(), metagroup_name.title(), metagroup.title()))
-        else:
-            ax.set_title('{} PIBO values for all {} groups'
-                          .format(y_axis_field.title(), group_field.title()))
+            ax.yaxis.grid(True)
+            ax.set_xlabel('{} Category'.format(group_field.title()))
+            ax.set_ylabel('{} Value'.format(y_axis_field.title()))
+            plt.xticks(rotation=90)
 
-        ax.yaxis.grid(True)
-        ax.set_xlabel('{} Category'.format(group_field.title()))
-        ax.set_ylabel('{} Value'.format(y_axis_field.title()))
-        plt.xticks(rotation=90)
-
-        # save plot
-        plot_name = os.path.join(out_folder, "{}_Plot.png".format(y_axis_field.title()))
-        plt.savefig(plot_name, bbox_inches='tight')
-        plt.close()
+            # save plot
+            plot_name = os.path.join(out_folder, "{}_Plot.png".format(y_axis_field.title()))
+            plt.savefig(plot_name, bbox_inches='tight')
+            plt.close()
+        except:
+            arcpy.AddMessage("\t\tCould not plot {}".format(y_axis_field))
 
 
 def get_data(data_shapefile, group_field, y_axis_field):
 
     # Pull comparison values from the comparison points shapefile
     actual_group_field = group_field[:10]
-    actual_y_axis_field = "Y_" + y_axis_field[:7]
+    actual_y_axis_field = "Y_" + y_axis_field[:8]
 
     groups_list = unique_values(data_shapefile, actual_group_field)
+
+    if " " in groups_list:
+        groups_list.remove(" ")
+
+    if "" in groups_list:
+        groups_list.remove("")
+
     data = []
 
     for group in groups_list:

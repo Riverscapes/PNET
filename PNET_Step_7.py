@@ -563,11 +563,15 @@ def weighted_average(to_parse, length_list):
             sum_list.append(data_value*weight)
 
         # Returns the final weighted average for the segment
-        return sum(sum_list)
+        to_return = sum(sum_list)
 
     else:
         # Return the value from the longest segment
-        return to_parse[length_list.index(max(length_list))]
+        to_return = to_parse[length_list.index(max(length_list))]
+
+    if to_return < 0:
+        arcpy.AddMessage(to_return)
+    return to_return
 
 
 def cleanup(reach_list):

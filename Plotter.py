@@ -49,6 +49,7 @@ def main():
 
 
 def create_plots(pnet_names, pnet_plot_fields, field_names, field_plot_fields, new_names, out_folder, data_csv, pnet_valid_list, field_valid_list, outlier_fields, outlier_reaches_list):
+
     field_list = get_fields(data_csv)
     plots_length = len(pnet_names)
     for count, (pnet_name, pnet_field, field_name, field_field,
@@ -227,7 +228,7 @@ def read_outliers_csv(to_read):
     for row in to_read_list:
 
         # This represents a new field
-        if row[1] == "":
+        if len(row) < 2:
             fields.append(row[0])
             outliers.append(curr_outliers)
             curr_outliers = []

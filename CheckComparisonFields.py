@@ -1,7 +1,7 @@
 import arcpy
 import os
 from PNET_Functions import get_watershed_folders, delete_old, create_csv,\
-    get_fields, csv_to_list, parse_multistring, make_folder
+    get_fields, csv_to_list, parse_multistring, make_folder, finish
 
 
 # -------------------------------------------------------------------------------
@@ -14,11 +14,11 @@ from PNET_Functions import get_watershed_folders, delete_old, create_csv,\
 # -------------------------------------------------------------------------------
 
 # The folder containing all watershed folders
-root_folder = r''
+root_folder = r'C:\Users\Tyler\Desktop\Work\FullRun'
 # The csv containing all field aquired data
-field_db = r''
+field_db = r'C:\Users\Tyler\Desktop\Work\PIBO_Fields_Master.csv'
 # CSV to set field data from
-input_field_csv = r''
+input_field_csv = r'C:\Users\Tyler\Desktop\Work\PNET_Fields_Master.csv'
 
 
 

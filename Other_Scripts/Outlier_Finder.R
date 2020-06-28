@@ -7,9 +7,9 @@ rm(list = ls())
       # THIS IS THE ONLY PART YOU NEED TO EDIT
 
       # Put your project_folder here (Make sure to do double slashes like this: \\)
-      project_folder = ""
+      project_folder = "C:\\Users\\Tyler\\Desktop\\Work\\FullRun"
       # Put your comparison fields csv here (Make sure to do double slashes like this: \\)
-      field_info_csv = ""
+      field_info_csv = "C:\\Users\\Tyler\\Desktop\\Work\\PNET_Fields_Master.csv"
       # Cook Values above this number wil be considered outliers
       cook_threshold = 1
 
@@ -117,6 +117,10 @@ for (row in 1:total_fields){
     write.table(export_list[pnet_field], save_loc  , append= T, sep=',' )
   }else{
     message(paste("No outliers were removed for", new_name))
+    export_list[[pnet_field]] = -9999
+    #export_list[[field_field]] = outlier_id
+    
+    write.table(export_list[pnet_field], save_loc  , append= T, sep=',' )
   }
 
   

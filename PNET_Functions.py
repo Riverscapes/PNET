@@ -136,6 +136,11 @@ def create_csv(output_csv, input_table):
 
     # Adapted from https://community.esri.com/thread/167462, Blake Terhune
 
+    try:
+        os.remove(output_csv)
+    except OSError:
+        pass
+
     fields = [f.name for f in arcpy.ListFields(input_table)]
     with open(output_csv, "w") as csvfile:
         csvwriter = csv.writer(csvfile, delimiter=',', lineterminator='\n')
@@ -239,4 +244,4 @@ def csv_to_list(csv_to_read):
 
 
 def finish():
-    print "\n---Finished!---"
+    print ("\n---Finished!---")
