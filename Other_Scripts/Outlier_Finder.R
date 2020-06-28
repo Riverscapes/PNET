@@ -4,36 +4,133 @@ library(MASS)
 # Clean workspace
 rm(list = ls())
 
-# Set working Directory
-setwd("C:\\Users\\Tyler\\Desktop\\Work\\Test_Run\\00_Scripttesting")
+      # THIS IS THE ONLY PART YOU NEED TO EDIT
 
-# Add in data from PNET output
-all_data = read.csv("All_Data.csv")
-fields =read.csv("R_Fields_Template.csv", fileEncoding="UTF-8-BOM")
+      # Put your project_folder here (Make sure to do double slashes like this: \\)
+      project_folder = "C:\\Users\\Tyler\\Desktop\\Work\\FullRun"
+      # Put your comparison fields csv here (Make sure to do double slashes like this: \\)
+      field_info_csv = "C:\\Users\\Tyler\\Desktop\\Work\\PNET_Fields_Master.csv"
+      # Cook Values above this number wil be considered outliers
+      cook_threshold = 1
+
+# Get PNET data
+all_data_location = "\\00_Projectwide\\Outputs\\Comparisons\\Numerical\\Numerical_Comparison_Data.csv"
+all_data = read.csv(paste(project_folder, all_data_location, sep = ""))
+fields =read.csv(field_info_csv, fileEncoding="UTF-8-BOM")
 export_list = list()
+save_loc_csv = "\\00_Projectwide\\Outputs\\Comparisons\\Numerical\\Outliers.csv"
+save_loc = paste(project_folder, save_loc_csv, sep = "")
 
-for (row in 1:nrow(fields)){
-  pnet_field = lapply((fields[row, "pnet"]), as.character)[[1]]
-  pibo_field = lapply((fields[row, "pibo"]), as.character)[[1]]
-  new_name = lapply((fields[row, "newname"]), as.character)[[1]]
+#Check if the file already exists
+if (file.exists(save_loc)){
+  #Delete file if it exists
+  file.remove(save_loc)
+}
+
+# Intitialize counters
+total_fields = nrow(fields)
+finished_counter = 0
+outlier_counter = 0
+outlier_only_counter = 0
+
+# Loop for each field combination
+for (row in 1:total_fields){
   
-  analysis = all_data[, c("RchID", pnet_field, pibo_field)]
+  # Get data from CSV
+  new_name = lapply((fields[row, "Name"]), as.character)[[1]]
+  pnet_valid = lapply((fields[row, "PNET_Valid"]), as.character)[[1]]
+  field_valid = lapply((fields[row, "Field_Valid"]), as.character)[[1]]
+  pnet_mod = "pn_"
+  field_mod = "fd_"
+  pnet_field = paste(pnet_mod, strtrim(new_name, 7),sep = "")
+  field_field = paste(field_mod, strtrim(new_name, 7),sep = "")
+  analysis = all_data[, c("RchID", pnet_field, field_field)]
+  
+  #Remove invalid data
+  if (pnet_valid == "Y"){
+    analysis_new = analysis[analysis[[pnet_field]] >= 0 , ]
+  }else{
+    analysis_new = analysis[analysis[[pnet_field]] > 0 , ]
+  }
+
+  if (field_valid == "Y"){
+    analysis = analysis_new[analysis_new[[field_field]] >= 0 , ]
+  }else{
+    analysis = analysis_new[analysis_new[[field_field]] > 0 , ]
+  }
+
+  
+  # Create a linear model
   fit <- lm(analysis[,2]~analysis[,3]) 
-  fit_res = studres(fit)
-  fit_res_df = cbind(read.table(text = names(fit_res)), fit_res)
-  new_data = cbind(analysis, fit_res_df)
-  outliers = new_data[abs(new_data$fit_res) > 2,]
-  outlier_id = outliers$RchID
-  message(paste(new_name, "Outliers"))
-  for (reach in outlier_id){
-    message(paste("\"RchID\" = ", reach, " OR"))
+  
+  # Initialize Cooks Data
+  continue_cooks = TRUE
+  outliers = data.frame(RchID=(numeric()))
+  
+  # Keep recalculating Cooks until all outliers have been removed
+  while (continue_cooks == TRUE){
+    
+    # Calculate Cooks Distance
+    cooks_list = cooks.distance(fit)
+    # Find Highest Cooks Distance Value
+    highest_cooks = max(cooks_list)
+    
+    # If there are any cooks values above the threshold, they need to be removed
+    if (highest_cooks >= cook_threshold){
+      
+      # Find the index of the highest cooks value
+      cooks_index = which(cooks_list %in% highest_cooks)[1]
+      # Get the reach ID of the outlier
+      outlier_reach = analysis$RchID[[cooks_index]]
+      # Add that reach ID to the list of outliers
+      new_outliers = rbind(outliers, data.frame(RchID = outlier_reach))
+      outliers = new_outliers
+      # Remove the outlier from the dataset
+      analysis = analysis[-c(cooks_index), ]
+      # Create a new linear regression, this time with the outlier removed
+      fit <- lm(analysis[,2]~analysis[,3])
+      
+      # Check to make sure the list hasn't been reduced to a single number (This can happen when all of the outliers are non-zeros)
+      if((length(unique(analysis[,2])) == 1) || (length(unique(analysis[,3])) == 1)){
+        continue_cooks = FALSE
+      }
+      # Increment Counter
+      outlier_counter = outlier_counter + 1
+      
+    }else{
+      continue_cooks = FALSE
+    }
   }
   
-  export_list[[pnet_field]] = outlier_id
-  export_list[[pibo_field]] = outlier_id
+  # Print data
+  num_outliers = nrow(outliers)
   
-  write.table(export_list[pnet_field], 'Outliers.csv'  , append= T, sep=',' )
-  write.table(export_list[pibo_field], 'Outliers.csv'  , append= T, sep=',' )
+  if(num_outliers > 0){
+    
+    outlier_only_counter = outlier_only_counter + 1
+    message(paste(num_outliers, " outliers were removed for", new_name))
+    outlier_id = outliers$RchID
+    
+    export_list[[pnet_field]] = outlier_id
+    #export_list[[field_field]] = outlier_id
+    
+    write.table(export_list[pnet_field], save_loc  , append= T, sep=',' )
+  }else{
+    message(paste("No outliers were removed for", new_name))
+    export_list[[pnet_field]] = -9999
+    #export_list[[field_field]] = outlier_id
+    
+    write.table(export_list[pnet_field], save_loc  , append= T, sep=',' )
+  }
+
+  
+  finished_counter = finished_counter + 1
+
 }
+
+message(paste("---DONE---["), finished_counter, "/", total_fields, "]")
+message(paste("Average Outliers [All Comparisons]: "), outlier_counter/total_fields)
+message(paste("Average Outliers [Comparisons with outliers]: "), outlier_counter/outlier_only_counter)
+
 
 

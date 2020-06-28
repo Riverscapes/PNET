@@ -66,6 +66,7 @@ def main():
             new_network_save = os.path.join(watershed, "Inputs", "Data_Networks", name)
             arcpy.Clip_analysis(network, old_stream_network, new_network_save)
 
+
             # Don't create an empty shapefile
             if is_empty(new_network_save):
                 arcpy.AddMessage("Did not save {}, as it was empty".format(new_network_save))

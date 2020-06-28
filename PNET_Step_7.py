@@ -540,18 +540,38 @@ def parse_multi_seg(to_parse, length_list):
 
 def weighted_average(to_parse, length_list):
 
-    # Calculates the relative weight of each segment, based on its proportion of the total PIBO reach length
-    weight_list = []
-    for length in length_list:
-        weight_list.append(length/sum(length_list))
+    # Converts everything to floats
+    to_parse = [float(s) for s in to_parse]
+    length_list = [float(s) for s in length_list]
 
-    # Multiplies the weights by their values for each segment
-    sum_list = []
-    for data_value, weight in zip(to_parse, weight_list):
-        sum_list.append(data_value*weight)
+    # Remove negative values
+    new_values = [value for value in to_parse if value > 0]
+    new_lengths = []
+    for keep in new_values:
+        new_lengths.append(length_list[to_parse.index(keep)])
 
-    # Returns the final weighted average for the segment
-    return sum(sum_list)
+    if len(new_lengths) > 1:
+
+        # Calculates the relative weight of each segment, based on its proportion of the total PIBO reach length
+        weight_list = []
+        for length in new_lengths:
+            weight_list.append(length/sum(new_lengths))
+
+        # Multiplies the weights by their values for each segment
+        sum_list = []
+        for data_value, weight in zip(new_values, weight_list):
+            sum_list.append(data_value*weight)
+
+        # Returns the final weighted average for the segment
+        to_return = sum(sum_list)
+
+    else:
+        # Return the value from the longest segment
+        to_return = to_parse[length_list.index(max(length_list))]
+
+    if to_return < 0:
+        arcpy.AddMessage(to_return)
+    return to_return
 
 
 def cleanup(reach_list):
