@@ -1,0 +1,12 @@
+﻿pnet,pibo,newname
+pnet_Bankf,fld_Bankf,Bankfull_Width
+pnet_Slope,fld_Slope,Slope
+pnet_Sinuo,fld_Sinuo,Sinuosity
+pnet_03_D5,fld_03_D5,03_D50
+pnet_04_D5,fld_04_D5,04_D50
+pnet_Reach,fld_Reach,Reach_Length
+pnet_Deveg,fld_Deveg,Devegetation_Proportion
+pnet_G_Inv,fld_G_Inv,G_Invasive_Proportion
+pnet_X_Inv,fld_X_Inv,X_Invasive_Proportion
+pnet_R_Inv,fld_R_Inv,R_Invasive_Proportion
+pnet_Conif,fld_Conif,Conifer_Proportion

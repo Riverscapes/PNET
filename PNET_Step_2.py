@@ -8,7 +8,7 @@ from PNET_Functions import is_even, get_watershed_folders, delete_old, finish, p
 # Author:      Tyler Hatch
 #
 # Created:     09/23/2019
-# Latest Update: 5/4/2020
+# Latest Update: 2/9/2020
 # -------------------------------------------------------------------------------
 
 # A list of file locations pointing to each watershed's All_points folder
@@ -18,7 +18,7 @@ use_threshold = parse_bool(arcpy.GetParameterAsText(1))
 # The longest distance (m) to go before snapping stops and remaining points are considered outliers to be investigated
 threshold_range = int(arcpy.GetParameterAsText(2))
 # Snapping distances will increase by this increment (m). Default is ten. Lower values mean longer run time.
-custom_increment = 10
+custom_increment = int(arcpy.GetParameterAsText(3))
 
 
 def main():

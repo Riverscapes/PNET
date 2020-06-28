@@ -2,6 +2,7 @@ import arcpy
 import os
 import shutil
 import csv
+import time
 
 # -------------------------------------------------------------------------------
 # Name:        PNET_Functions
@@ -12,6 +13,35 @@ import csv
 # Created:     2/9/2020
 # Latest Update: 2/9/2020
 # -------------------------------------------------------------------------------
+
+
+def start ():
+    arcpy.env.overwriteOutput = True
+    return time.time()
+
+
+def update (watershed, watershed_list, start_time):
+
+    total = len(watershed_list)
+    this_one = watershed_list.index(watershed)
+
+    curr_time = time.time()
+    time_elapsed = curr_time-start_time
+    if this_one > 0:
+        time_per_watershed = time_elapsed/this_one
+        watersheds_left = total-this_one
+        time_left = time_per_watershed * watersheds_left
+        projectwide_estimate = time_per_watershed * 2
+        estimate = time_left + projectwide_estimate
+        estimate = int(estimate/60)
+    else:
+        estimate = "?"
+
+    arcpy.AddMessage("\nStarting {}({}/{})... [Time Remaining Estimate: {} Minutes]".format(watershed, this_one+1, total, estimate))
+
+
+def update_pw ():
+    arcpy.AddMessage("\nStarting Projectwide...")
 
 
 def parse_bool(parameter):
@@ -31,26 +61,18 @@ def make_folder(path_to_location, new_folder_name):
     return new_folder
 
 
-def delete_old(folder_to_clear, delete_type=False):
+def delete_old(folder_to_clear):
     # Clears an individual folder of all its data
     if os.path.exists(folder_to_clear):
 
         folder = folder_to_clear
         for the_file in os.listdir(folder):
             file_path = os.path.join(folder, the_file)
-            if delete_type:
-                if file_path.endswith(delete_type):
-                    try:
-                        if os.path.isfile(file_path):
-                            os.unlink(file_path)
-                    except Exception as e:
-                        print(e)
-            else:
-                try:
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-                except Exception as e:
-                    print(e)
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+            except Exception as e:
+                print(e)
 
 
 def delete_temps(temps_to_delete):
@@ -135,11 +157,6 @@ def get_field_index(field, shapefile):
 def create_csv(output_csv, input_table):
 
     # Adapted from https://community.esri.com/thread/167462, Blake Terhune
-
-    try:
-        os.remove(output_csv)
-    except OSError:
-        pass
 
     fields = [f.name for f in arcpy.ListFields(input_table)]
     with open(output_csv, "w") as csvfile:
@@ -244,4 +261,4 @@ def csv_to_list(csv_to_read):
 
 
 def finish():
-    print ("\n---Finished!---")
+    arcpy.AddMessage("\n---Finished!---")
