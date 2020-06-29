@@ -22,6 +22,8 @@ fixed_points = PNET_Functions.parse_bool(arcpy.GetParameterAsText(1))
 data_networks_list_in = PNET_Functions.parse_multistring(arcpy.GetParameterAsText(2))
 # All segments below this length in meters will not be considered when calculating multi segment reaches.
 length_cutoff = int(arcpy.GetParameterAsText(3))
+# This determines if D50 is calculated or not.
+perform_d50 = PNET_Functions.parse_bool(arcpy.GetParameterAsText(4))
 
 
 def main():
@@ -36,6 +38,10 @@ def main():
     data_network_input(root_folder, data_networks_list_in)
     # Old Step 7
     data_network_extraction(root_folder, length_cutoff)
+    # Old Step 8a
+    reach_merging(root_folder)
+    # Old Step 8b
+    calculate_d50(root_folder)
 
 
 def reach_preparation(root_folder, fixed_points):
@@ -488,9 +494,9 @@ def data_network_extraction(root_folder, length_cutoff):
     # Initialize variables and file locations
     arcpy.env.overwriteOutput = True
 
-    watershed_folders = get_watershed_folders(root_folder)
+    watershed_folders = PNET_Functions.get_watershed_folders(root_folder)
     projectwide_output = os.path.join(root_folder, "00_ProjectWide", "Intermediates", "Extraction", "Outputs")
-    delete_old(projectwide_output)
+    PNET_Functions.delete_old(projectwide_output)
 
     to_merge = []
     # Add a bunch of blank lists to the to_merge list, one space for each data network type
@@ -507,7 +513,7 @@ def data_network_extraction(root_folder, length_cutoff):
 
         arcpy.AddMessage("Starting " + watershed_folder + "...")
         for data_network_count, data_network in enumerate(network_list):
-            if not is_empty(data_network):
+            if not PNET_Functions.is_empty(data_network):
 
                 old_reaches = os.path.join(watershed_folder, "Intermediates",
                                            "Extraction", "Inputs", "Field_Reaches_Clean.shp")
@@ -519,8 +525,8 @@ def data_network_extraction(root_folder, length_cutoff):
 
                 arcpy.AddMessage("\tStarting {}...".format(data_network_name))
 
-                data_network_folder = make_folder(output_folder, data_network_name)
-                delete_old(data_network_folder)
+                data_network_folder = PNET_Functions.make_folder(output_folder, data_network_name)
+                PNET_Functions.delete_old(data_network_folder)
 
                 reaches = os.path.join(data_network_folder, "Reaches_Temp.shp")
 
@@ -548,8 +554,8 @@ def data_network_extraction(root_folder, length_cutoff):
                     if field in field_names:
                         arcpy.DeleteField_management(clipped_data_network, field)
 
-                data_network_fields = get_fields(data_network)
-                pnet_fields = get_fields(old_reaches)
+                data_network_fields = PNET_Functions.get_fields(data_network)
+                pnet_fields = PNET_Functions.get_fields(old_reaches)
                 fields_to_keep = pnet_fields + data_network_fields
 
 
@@ -558,15 +564,15 @@ def data_network_extraction(root_folder, length_cutoff):
                 extract_network(reaches, clipped_data_network, reaches_save, data_network_folder, pnet_fields)
 
                 # Remove all unnecessary fields
-                keep_fields(reaches_save, fields_to_keep)
+                PNET_Functions.keep_fields(reaches_save, fields_to_keep)
                 #remove_empty_fields(reaches_save, pnet_fields)
 
                 # Delete any temporary shape files created
-                delete_temps(to_delete)
+                PNET_Functions.delete_temps(to_delete)
 
 
 
-                create_csv(os.path.join(data_network_folder, "{}.csv".format(data_network_name)), reaches_save)
+                PNET_Functions.create_csv(os.path.join(data_network_folder, "{}.csv".format(data_network_name)), reaches_save)
                 to_merge[data_network_count].append([reaches_save, data_network_name])
 
     # Iterate through to_merge, and save a point and network shapefile for each data network
@@ -575,14 +581,14 @@ def data_network_extraction(root_folder, length_cutoff):
     for data_network_type in to_merge:
         to_merge_networks = []
         save_name = data_network_type[0][1]
-        save_folder = make_folder(projectwide_output, save_name)
+        save_folder = PNET_Functions.make_folder(projectwide_output, save_name)
         for watershed in data_network_type:
             to_merge_networks.append(watershed[0])
         csv_save = arcpy.Merge_management(to_merge_networks,
                                os.path.join(save_folder, save_name + "_Points_Extracted.shp"))
-        create_csv(os.path.join(save_folder, "{}.csv".format(save_name)), csv_save)
+        PNET_Functions.create_csv(os.path.join(save_folder, "{}.csv".format(save_name)), csv_save)
 
-    finish()
+    PNET_Functions.finish()
 
 
 def get_data_networks(watershed_folder):
@@ -653,7 +659,7 @@ def extract_network(network, data_network, output, data_network_folder, fields_t
         arcpy.CopyFeatures_management(extracted_one, output)
 
     # Delete any temporary shape files created
-    delete_temps(to_delete)
+    PNET_Functions.delete_temps(to_delete)
 
     # Return the shapefile with all PIBO reaches, now with data_network data
     return output
@@ -687,7 +693,7 @@ def extract_multiple(network, data_network, temp, fields_to_keep, data_network_f
         if field in field_names:
             arcpy.DeleteField_management(network, field)
     fields_to_keep += fields_to_delete
-    keep_fields(network, fields_to_keep)
+    PNET_Functions.keep_fields(network, fields_to_keep)
 
     # Creates a shapefile with an entry for every data_network segment that overlaps a PIBO reach
     arcpy.SpatialJoin_analysis(network, data_network, temp, "JOIN_ONE_TO_MANY")
@@ -1050,6 +1056,175 @@ def cleanup(reach_list):
         reach.pop(-3)
 
     return cleaned_list
+
+
+def reach_merging(root_folder):
+    # Initialize variables and file locations
+    arcpy.env.overwriteOutput = True
+
+    watershed_folders = PNET_Functions.get_watershed_folders(root_folder)
+    projectwide_output = os.path.join(root_folder, "00_ProjectWide", "Outputs", "Extracted_Data")
+    PNET_Functions.delete_old(projectwide_output)
+    to_merge_points = []
+    req_fields = ["RchID", "FID", "Shape"]
+
+    # This loops for each watershed folder
+    for watershed in watershed_folders:
+        arcpy.AddMessage("Working on {}...".format(watershed))
+
+        # Initialize list of all unique data networks within this watershed
+        point_list = get_data_points(watershed)
+        output_folder = os.path.join(watershed, "Outputs", "Extracted_Data")
+        PNET_Functions.delete_old(output_folder)
+
+        # Create temporary shapefiles to store spatially joined data
+        all_joined = os.path.join(output_folder, "temp.shp")
+
+        # Join the first and second network's data together, and store them into a temporary shapefile
+        arcpy.AddMessage("\t Merging first points...")
+
+        arcpy.Copy_management(point_list[0], all_joined)
+        all_fields = PNET_Functions.get_fields(all_joined)
+        for field in req_fields:
+            if field in all_fields:
+                all_fields.remove(field)
+
+        point_list.pop(0)
+
+        # Check to make sure there are still networks to join
+        if len(point_list) > 0:
+
+            # This repeats for each of the two remaining networks
+            for data in point_list:
+
+                arcpy.AddMessage("\t\tMerging more points...")
+                data_temp = os.path.join(output_folder, "data_temp.shp")
+                arcpy.Copy_management(data, data_temp)
+                data = data_temp
+                remove_existing_fields(all_fields, data)
+
+                # Join the current network to the previous network containing all other data
+                arcpy.JoinField_management(all_joined, "RchID", data, "RchID")
+                arcpy.DeleteField_management(all_joined, "RchID_1")
+                all_fields = PNET_Functions.get_fields(all_joined)
+                for field in req_fields:
+                    if field in all_fields:
+                        all_fields.remove(field)
+
+        # Save the output into the correct folder
+        save = arcpy.Copy_management(all_joined,
+                                     os.path.join(output_folder, "Extraction_Merge_Points.shp"))
+
+        to_merge_points.append(save)
+
+        PNET_Functions.create_csv(os.path.join(output_folder, "All_Data.csv"), save)
+
+        # Delete both temp shapefiles
+        arcpy.Delete_management(all_joined)
+        arcpy.Delete_management(data_temp)
+
+    arcpy.AddMessage("Working on Projectwide...")
+
+    make_csv = arcpy.Merge_management(to_merge_points,
+                           os.path.join(projectwide_output, "Extraction_Merge_Points.shp"))
+    PNET_Functions.create_csv(os.path.join(projectwide_output, "All_Data.csv"), make_csv)
+    PNET_Functions.finish()
+
+
+def get_data_points(watershed_folder):
+
+    # Gets a list of all network shapefile locations
+    to_return = []
+    network_folder = os.path.join(watershed_folder, "Intermediates", "Extraction", "Outputs")
+    data_network_list = PNET_Functions.get_folder_list(network_folder, False)
+
+    for folder in data_network_list:
+
+        for r, d, f in os.walk(folder):
+            for file in f:
+                # This line makes sure it is a shapefile
+                if '.shp' in file and 'Reaches' not in file and '.xml' not in file and '.lock' not in file:
+                    to_return.append(os.path.join(r, file))
+    to_keep = []
+    for file in to_return:
+        if not PNET_Functions.is_empty(file):
+            to_keep.append(file)
+
+    return to_keep
+
+
+def remove_existing_fields(all_fields_list, shapefile):
+
+    # Removes all fields tht are already part of the merged shapefile
+    cur_fields = PNET_Functions.get_fields(shapefile)
+    deleted_fields = []
+    for cur_field in cur_fields:
+        if cur_field in all_fields_list:
+            arcpy.DeleteField_management(shapefile, cur_field)
+            deleted_fields.append(cur_field)
+
+    return deleted_fields
+
+
+def calculate_d50(root_folder):
+    discharge_field = "iHyd_Q2"
+    bankfull_field = "BFWIDTH"
+    slope_field = "iGeo_Slope"
+    input_fields = [discharge_field, bankfull_field, slope_field]
+
+    # Initialize variables and file locations
+    arcpy.env.overwriteOutput = True
+    watershed_folders = PNET_Functions.get_watershed_folders(root_folder)
+
+    # Setup projectwide data
+    data_path = r"Outputs/Extracted_Data/Extraction_Merge_Points.shp"
+    watershed_folders.append(os.path.join(root_folder, "00_ProjectWide"))
+
+    for watershed in watershed_folders:
+
+        # get filepath
+        arcpy.AddMessage("Working on {}...".format(watershed))
+        watershed_extracted = os.path.join(watershed, data_path)
+
+        # Check to make sure we have the necessary fields
+        existing_fields = PNET_Functions.get_fields(watershed_extracted)
+        can_run = True
+        for input_field in input_fields:
+            if input_field not in existing_fields:
+                can_run = False
+                arcpy.AddWarning("Fields needed to calculate D50 not found, no D50 will be calculated")
+
+        # Calculate and add D50 for each point
+        if can_run:
+
+            # Add the fields where we will store d50 values
+            d50_fields = ["PredD50_03", "PredD50_04"]
+            arcpy.AddField_management(watershed_extracted, d50_fields[0], "FLOAT")
+            arcpy.AddField_management(watershed_extracted, d50_fields[1], "FLOAT")
+
+            # Add d50 values to every point
+            with arcpy.da.UpdateCursor(watershed_extracted, input_fields + d50_fields) as cursor:
+                for row in cursor:
+                    # Calculate d50 with given values
+                    d50_03, d50_04 = calculate_equation(row[0], row[1], row[2])
+                    # Update with new d50 values
+                    cursor.updateRow([row[0], row[1], row[2], d50_03, d50_04])
+
+            # Update CSV
+            PNET_Functions.create_csv(os.path.join(watershed, "Outputs", "Extracted_Data", "All_Data.csv"),
+                                      watershed_extracted)
+
+
+def calculate_equation(discharge, bankfull, slope, n=.035, tc03=.03, tc04=.04):
+    # Calculate using TC03
+    tco3_d50 = ((997 * 9.81) * n * ((discharge - .0283168) ** (3 / 5)) * (bankfull ** (-3 / 5)) * (slope ** (7 / 10))) / \
+               ((2650 - 997) * 9.81 * tc03)
+
+    # Calculate using TC04
+    tco4_d50 = ((997 * 9.81) * n * ((discharge - .0283168) ** (3 / 5)) * (bankfull ** (-3 / 5)) * (slope ** (7 / 10))) / \
+               ((2650 - 997) * 9.81 * tc04)
+
+    return tco3_d50, tco4_d50
 
 
 if __name__ == "__main__":
