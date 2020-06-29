@@ -55,6 +55,8 @@ def main():
     calculate_d50(root_folder)
     # Old Step 9a
     numerical_comparisons(root_folder, field_db, input_field_csv)
+    # Old Step 10
+    categorical_comparisons(root_folder, input_comparison_field_csv)
 
 
 def reach_preparation(root_folder, fixed_points):
