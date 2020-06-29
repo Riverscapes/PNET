@@ -52,7 +52,8 @@ def main():
     # Old Step 8a
     reach_merging(root_folder)
     # Old Step 8b
-    calculate_d50(root_folder)
+    if perform_d50:
+        calculate_d50(root_folder)
     # Old Step 9a
     numerical_comparisons(root_folder, field_db, input_field_csv)
     # Old Step 10
