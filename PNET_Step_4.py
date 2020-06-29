@@ -1,8 +1,7 @@
 import arcpy
 import os
 from collections import Counter
-from PNET_Functions import get_watershed_folders, delete_old, \
-    finish, delete_temps, remove_fields, attribute_table_to_list, get_field_index
+import PNET_Functions
 
 # -------------------------------------------------------------------------------
 # Name:        PNET Step 4
@@ -23,8 +22,8 @@ def main():
     # Initialize variables
     arcpy.env.overwriteOutput = True
 
-    watershed_folders = get_watershed_folders(root_folder)
-    delete_old(os.path.join(root_folder, "00_ProjectWide", "Intermediates", "Reach_Editing", "Outputs"))
+    watershed_folders = PNET_Functions.get_watershed_folders(root_folder)
+    PNET_Functions.delete_old(os.path.join(root_folder, "00_ProjectWide", "Intermediates", "Reach_Editing", "Outputs"))
     temps_to_delete = []
     to_merge_points = []
     to_merge_reaches = []
@@ -35,7 +34,7 @@ def main():
         # Get file names
         input_folder = os.path.join(watershed, "Intermediates", "Reach_Editing", "Inputs")
         output_folder = os.path.join(watershed, "Intermediates", "Reach_Editing", "Outputs")
-        delete_old(output_folder)
+        PNET_Functions.delete_old(output_folder)
 
         stream_seg = os.path.join(input_folder, "Stream_Network_Segments.shp")
         points = os.path.join(input_folder, "Points_Merge.shp")
@@ -58,14 +57,14 @@ def main():
 
         spatial_joined = os.path.join(input_folder, "Spatial_Joined_Temp.shp")
         temps_to_delete.append(spatial_joined)
-        remove_fields(fields_to_remove, stream_seg)
+        PNET_Functions.remove_fields(fields_to_remove, stream_seg)
         arcpy.SpatialJoin_analysis(stream_seg, points, spatial_joined, "JOIN_ONE_TO_MANY")
 
         # Get an attribute table list of the joined shapefile to analyze
-        stream_seg_list = attribute_table_to_list(spatial_joined)
-        reach_id_index = get_field_index("TARGET_FID", spatial_joined)
-        point_id_index = get_field_index("SiteID", spatial_joined)
-        tor_bor_index = get_field_index("TOR_BOR", spatial_joined)
+        stream_seg_list = PNET_Functions.attribute_table_to_list(spatial_joined)
+        reach_id_index = PNET_Functions.get_field_index("TARGET_FID", spatial_joined)
+        point_id_index = PNET_Functions.get_field_index("SiteID", spatial_joined)
+        tor_bor_index = PNET_Functions.get_field_index("TOR_BOR", spatial_joined)
 
         new_list = split_list_by_id(stream_seg_list, reach_id_index)
         to_delete_list = []
@@ -113,8 +112,8 @@ def main():
     projectwide_folder = os.path.join(root_folder, "00_ProjectWide", "Intermediates", "Reach_Editing", "Outputs")
     arcpy.Merge_management(to_merge_points, os.path.join(projectwide_folder, "Field_Points.shp"))
     arcpy.Merge_management(to_merge_reaches, os.path.join(projectwide_folder, "Field_Reaches.shp"))
-    delete_temps(temps_to_delete)
-    finish()
+    PNET_Functions.delete_temps(temps_to_delete)
+    PNET_Functions.finish()
 
 
 def split_list_by_id(segment_list, id_index):

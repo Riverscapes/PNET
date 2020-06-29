@@ -1,6 +1,7 @@
 import arcpy
 import os
-from PNET_Functions import get_watershed_folders, delete_old, finish, delete_temps, is_empty, parse_bool
+from collections import Counter
+import PNET_Functions
 
 # -------------------------------------------------------------------------------
 # Name:        PNET Step 3
@@ -16,7 +17,7 @@ from PNET_Functions import get_watershed_folders, delete_old, finish, delete_tem
 root_folder = arcpy.GetParameterAsText(0)
 # If True, this indicates that the user edited the unsnapped points, and the corrections are now saved in
 # ProjectWide/Intermediates/Points/Unsnapped_Fixed
-fixed_points = parse_bool(arcpy.GetParameterAsText(1))
+fixed_points = PNET_Functions.parse_bool(arcpy.GetParameterAsText(1))
 
 
 def main():
@@ -27,9 +28,9 @@ def reach_preparation(root_folder, fixed_points):
     # Initialize variables
     arcpy.env.overwriteOutput = True
 
-    watershed_folders = get_watershed_folders(root_folder)
+    watershed_folders = PNET_Functions.get_watershed_folders(root_folder)
 
-    delete_old(os.path.join(root_folder, "00_ProjectWide", "Intermediates", "Reach_Editing", "Inputs"))
+    PNET_Functions.delete_old(os.path.join(root_folder, "00_ProjectWide", "Intermediates", "Reach_Editing", "Inputs"))
 
     project_networks = []
     project_points = []
@@ -49,7 +50,7 @@ def reach_preparation(root_folder, fixed_points):
         output_folder = os.path.join(watershed_folder, "Intermediates", "Reach_Editing", "Inputs")
         network = os.path.join(watershed_folder, "Inputs", "Stream_Network", "Stream_Network.shp")
 
-        delete_old(output_folder)
+        PNET_Functions.delete_old(output_folder)
 
         new_tor_filename = "temp_tor.shp"
         new_tor_points = os.path.join(watershed_folder, new_tor_filename)
@@ -68,7 +69,7 @@ def reach_preparation(root_folder, fixed_points):
             tor_temp_merge = os.path.join(watershed_folder, tor_temp_name)
             tor_fixed = \
                 os.path.join(watershed_folder, "Intermediates", "Points", "Unsnapped_Fixed", "TOR_Points_Fixed.shp")
-            if not is_empty(tor_fixed):
+            if not PNET_Functions.is_empty(tor_fixed):
                 arcpy.Merge_management([tor_fixed, old_tor_points], tor_temp_merge)
                 temps_to_delete.append(tor_temp_merge)
                 old_tor_points = tor_temp_merge
@@ -77,7 +78,7 @@ def reach_preparation(root_folder, fixed_points):
             bor_temp_merge = os.path.join(watershed_folder, bor_temp_name)
             bor_fixed = \
                 os.path.join(watershed_folder, "Intermediates", "Points", "Unsnapped_Fixed", "BOR_Points_Fixed.shp")
-            if not is_empty(bor_fixed):
+            if not PNET_Functions.is_empty(bor_fixed):
                 arcpy.Merge_management([bor_fixed, old_bor_points], bor_temp_merge)
                 temps_to_delete.append(bor_temp_merge)
                 old_bor_points = bor_temp_merge
@@ -134,8 +135,8 @@ def reach_preparation(root_folder, fixed_points):
     arcpy.AddMessage("Saving ProjectWide...")
     make_projectwide(root_folder, project_points, project_networks)
 
-    delete_temps(temps_to_delete)
-    finish()
+    PNET_Functions.delete_temps(temps_to_delete)
+    PNET_Functions.finish()
 
 
 def save_fixed_points(stream_network, fixed_folder, watershed_folders):
