@@ -1,7 +1,6 @@
 import arcpy
 import os
-from PNET_Functions import make_folder, remove_folder, get_folder_list, attribute_table_to_list, get_field_index, \
-    delete_temps, get_watershed_folders, delete_old, finish, parse_bool
+import PNET_Functions
 
 # -------------------------------------------------------------------------------
 # Name:        PNET Step 1
@@ -27,7 +26,7 @@ stream_network = arcpy.GetParameterAsText(4)
 # Data year (The year which you want field data to be closest to)
 data_year = int(arcpy.GetParameterAsText(5))
 # Set this to true if you want the threshold value to be used. This should almost always be True
-use_threshold = parse_bool(arcpy.GetParameterAsText(6))
+use_threshold = PNET_Functions.parse_bool(arcpy.GetParameterAsText(6))
 # The longest distance (m) to go before snapping stops and remaining points are considered outliers to be investigated
 threshold_range = int(arcpy.GetParameterAsText(7))
 # Snapping distances will increase by this increment (m). Default is ten. Lower values mean longer run time.
@@ -52,8 +51,8 @@ def data_preparation(tor_points, bor_points, stream_network, root_folder, data_y
     temps_to_delete = []
 
     # Remove all existing content
-    for folder in get_folder_list(root_folder, True):
-        remove_folder(folder)
+    for folder in PNET_Functions.get_folder_list(root_folder, True):
+        PNET_Functions.remove_folder(folder)
 
     # Get the name of every watershed
     for row in arcpy.da.SearchCursor(watersheds, ["Name"]):
@@ -128,9 +127,9 @@ def data_preparation(tor_points, bor_points, stream_network, root_folder, data_y
     wat_save_location = os.path.join(project_folder, "Inputs", "Watershed_Boundary", "Watershed_Boundary.shp")
     arcpy.Copy_management(watersheds, wat_save_location)
 
-    delete_temps(temps_to_delete)
+    PNET_Functions.delete_temps(temps_to_delete)
 
-    finish()
+    PNET_Functions.finish()
 
 
 def make_structure(main_folder, watershed_name):
@@ -140,38 +139,38 @@ def make_structure(main_folder, watershed_name):
     watershed_name = watershed_name.replace("-", "")
 
     # Create a folder within the main folder with the Watershed's name
-    watershed_folder = make_folder(main_folder, watershed_name)
+    watershed_folder = PNET_Functions.make_folder(main_folder, watershed_name)
 
     # Within the Watershed folder, create a folder for inputs, intermediates, and outputs
-    input_folder = make_folder(watershed_folder, "Inputs")
-    intermediate_folder = make_folder(watershed_folder, "Intermediates")
-    output_folder = make_folder(watershed_folder, "Outputs")
+    input_folder = PNET_Functions.make_folder(watershed_folder, "Inputs")
+    intermediate_folder = PNET_Functions.make_folder(watershed_folder, "Intermediates")
+    output_folder = PNET_Functions.make_folder(watershed_folder, "Outputs")
 
     # Make all folders within inputs
-    make_folder(input_folder, "Watershed_Boundary")
-    make_folder(input_folder, "Stream_Network")
-    make_folder(input_folder, "Data_Networks")
-    make_folder(input_folder, "Database")
+    PNET_Functions.make_folder(input_folder, "Watershed_Boundary")
+    PNET_Functions.make_folder(input_folder, "Stream_Network")
+    PNET_Functions.make_folder(input_folder, "Data_Networks")
+    PNET_Functions.make_folder(input_folder, "Database")
 
-    point_folder = make_folder(input_folder, "Points")
+    point_folder = PNET_Functions.make_folder(input_folder, "Points")
 
     # Make all folders within intermediates
-    point_folder_int = make_folder(intermediate_folder, "Points")
-    make_folder(point_folder_int, "Unsnapped")
-    make_folder(point_folder_int, "Snapped")
-    make_folder(point_folder_int, "Unsnapped_Fixed")
+    point_folder_int = PNET_Functions.make_folder(intermediate_folder, "Points")
+    PNET_Functions.make_folder(point_folder_int, "Unsnapped")
+    PNET_Functions.make_folder(point_folder_int, "Snapped")
+    PNET_Functions.make_folder(point_folder_int, "Unsnapped_Fixed")
 
-    me_folder = make_folder(intermediate_folder, "Reach_Editing")
-    make_folder(me_folder, "Inputs")
-    make_folder(me_folder, "Outputs")
+    me_folder = PNET_Functions.make_folder(intermediate_folder, "Reach_Editing")
+    PNET_Functions.make_folder(me_folder, "Inputs")
+    PNET_Functions.make_folder(me_folder, "Outputs")
 
-    ext_folder = make_folder(intermediate_folder, "Extraction")
-    make_folder(ext_folder, "Inputs")
-    make_folder(ext_folder, "Outputs")
+    ext_folder = PNET_Functions.make_folder(intermediate_folder, "Extraction")
+    PNET_Functions.make_folder(ext_folder, "Inputs")
+    PNET_Functions.make_folder(ext_folder, "Outputs")
 
     # Make all folders within outputs
-    make_folder(output_folder, "Extracted_Data")
-    make_folder(output_folder, "Comparisons")
+    PNET_Functions.make_folder(output_folder, "Extracted_Data")
+    PNET_Functions.make_folder(output_folder, "Comparisons")
 
     return watershed_folder
 
@@ -186,10 +185,10 @@ def create_year_distance(shapefile, year_field, data_year):
 
 def delete_identical(shapefile, group_field, year_dif_field, id_field, final_save):
 
-    data_list = attribute_table_to_list(shapefile)
-    group_index = get_field_index(group_field, shapefile)
-    year_index = get_field_index(year_dif_field, shapefile)
-    id_index = get_field_index(id_field, shapefile)
+    data_list = PNET_Functions.attribute_table_to_list(shapefile)
+    group_index = PNET_Functions.get_field_index(group_field, shapefile)
+    year_index = PNET_Functions.get_field_index(year_dif_field, shapefile)
+    id_index = PNET_Functions.get_field_index(id_field, shapefile)
 
     # Create a dictionary with entries for each group
     site_dictionary = {}
@@ -237,11 +236,11 @@ def point_snapping(root_folder, use_threshold, threshold_range, custom_increment
     saved_tor_points_unsnapped = []
     saved_bor_points_unsnapped = []
 
-    watershed_folders = get_watershed_folders(root_folder)
+    watershed_folders = PNET_Functions.get_watershed_folders(root_folder)
 
     # Delete old content from this tool being re run.
-    delete_old(os.path.join(root_folder, "00_ProjectWide", "Intermediates", "Points", "Snapped"))
-    delete_old(os.path.join(root_folder, "00_ProjectWide", "Intermediates", "Points", "Unsnapped"))
+    PNET_Functions.delete_old(os.path.join(root_folder, "00_ProjectWide", "Intermediates", "Points", "Snapped"))
+    PNET_Functions.delete_old(os.path.join(root_folder, "00_ProjectWide", "Intermediates", "Points", "Unsnapped"))
 
     # This loops for every watershed
     for watershed_folder in watershed_folders:
@@ -252,8 +251,8 @@ def point_snapping(root_folder, use_threshold, threshold_range, custom_increment
         output_folder = os.path.join(watershed_folder, "Intermediates", "Points")
         network = os.path.join(watershed_folder, "Inputs", "Stream_Network", "Stream_Network.shp")
 
-        delete_old(os.path.join(output_folder, "Snapped"))
-        delete_old(os.path.join(output_folder, "Unsnapped"))
+        PNET_Functions.delete_old(os.path.join(output_folder, "Snapped"))
+        PNET_Functions.delete_old(os.path.join(output_folder, "Unsnapped"))
 
         bor_points_old = os.path.join(watershed_folder, "Inputs", "Points", "BOR_Points.shp")
         tor_points_old = os.path.join(watershed_folder, "Inputs", "Points", "TOR_Points.shp")
@@ -374,6 +373,6 @@ def point_snapping(root_folder, use_threshold, threshold_range, custom_increment
     arcpy.Copy_management(bor_points_new_unsnapped, os.path.join(output_folder, "Unsnapped_Fixed", "To_Fix_BOR.shp"))
     arcpy.Copy_management(tor_points_new_unsnapped, os.path.join(output_folder, "Unsnapped_Fixed", "To_Fix_TOR.shp"))
 
-    finish()
+    PNET_Functions.finish()
 if __name__ == "__main__":
     main()
