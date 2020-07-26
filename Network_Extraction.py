@@ -35,29 +35,40 @@ field_db = arcpy.GetParameterAsText(5)
 input_field_csv = arcpy.GetParameterAsText(6)
 # CSV to set comparison field data from instead (expects headers)
 input_comparison_field_csv = arcpy.GetParameterAsText(7)
+# What part to skip to if you are rerunning the tool
+skip_to = int(arcpy.GetParameterAsText(8))
 
 
 def main():
 
-    # Old Step 3
-    reach_preparation(root_folder, fixed_points)
-    # Old Step 4
-    reach_editing(root_folder)
-    # Old Step 5
-    data_cleaning(root_folder)
-    # Old Step 6
-    data_network_input(root_folder, data_networks_list_in)
-    # Old Step 7
-    data_network_extraction(root_folder, length_cutoff)
-    # Old Step 8a
-    reach_merging(root_folder)
-    # Old Step 8b
-    if perform_d50:
-        calculate_d50(root_folder)
-    # Old Step 9a
-    numerical_comparisons(root_folder, field_db, input_field_csv)
-    # Old Step 10
-    categorical_comparisons(root_folder, input_comparison_field_csv)
+    # Old Step 3 (Part 1)
+    if skip_to <= 1:
+        reach_preparation(root_folder, fixed_points)
+    # Old Step 4 (Part 2)
+    if skip_to <= 2:
+        reach_editing(root_folder)
+    # Old Step 5 (Part 3)
+    if skip_to <= 3:
+        data_cleaning(root_folder)
+    # Old Step 6 (Part 4)
+    if skip_to <= 4:
+        data_network_input(root_folder, data_networks_list_in)
+    # Old Step 7 (Part 5)
+    if skip_to <= 5:
+        data_network_extraction(root_folder, length_cutoff)
+    # Old Step 8a (Part 6)
+    if skip_to <= 6:
+        reach_merging(root_folder)
+    # Old Step 8b (Part 7)
+    if skip_to <= 7:
+        if perform_d50:
+            calculate_d50(root_folder)
+    # Old Step 9a (Part 8)
+    if skip_to <= 8:
+        numerical_comparisons(root_folder, field_db, input_field_csv)
+    # Old Step 10 (Part 9)
+    if skip_to <= 9:
+        categorical_comparisons(root_folder, input_comparison_field_csv)
 
 
 def reach_preparation(root_folder, fixed_points):
