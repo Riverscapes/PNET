@@ -7,6 +7,7 @@ import scipy.stats as stat
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import time
 
 # -------------------------------------------------------------------------------
 # Name:        PNET Step 3
@@ -20,21 +21,21 @@ import math
 
 # The folder containing all watershed folders
 root_folder = arcpy.GetParameterAsText(0)
+# A list of links to shapefiles that contain entire model runs
+data_networks_list_in = PNET_Functions.parse_multistring(arcpy.GetParameterAsText(1))
+# The database containing all field data
+field_db = arcpy.GetParameterAsText(2)
+# CSV to set numerical field data from instead (optional, expects headers)
+input_field_csv = arcpy.GetParameterAsText(3)
+# CSV to set comparison field data from instead (expects headers)
+input_comparison_field_csv = arcpy.GetParameterAsText(4)
+# All segments below this length in meters will not be considered when calculating multi segment reaches.
+length_cutoff = int(arcpy.GetParameterAsText(5))
 # If True, this indicates that the user edited the unsnapped points, and the corrections are now saved in
 # ProjectWide/Intermediates/Points/Unsnapped_Fixed
-fixed_points = PNET_Functions.parse_bool(arcpy.GetParameterAsText(1))
-# A list of links to shapefiles that contain entire model runs
-data_networks_list_in = PNET_Functions.parse_multistring(arcpy.GetParameterAsText(2))
-# All segments below this length in meters will not be considered when calculating multi segment reaches.
-length_cutoff = int(arcpy.GetParameterAsText(3))
+fixed_points = PNET_Functions.parse_bool(arcpy.GetParameterAsText(6))
 # This determines if D50 is calculated or not.
-perform_d50 = PNET_Functions.parse_bool(arcpy.GetParameterAsText(4))
-# The database containing all field data
-field_db = arcpy.GetParameterAsText(5)
-# CSV to set numerical field data from instead (optional, expects headers)
-input_field_csv = arcpy.GetParameterAsText(6)
-# CSV to set comparison field data from instead (expects headers)
-input_comparison_field_csv = arcpy.GetParameterAsText(7)
+perform_d50 = PNET_Functions.parse_bool(arcpy.GetParameterAsText(7))
 # What part to skip to if you are rerunning the tool
 skip_to = int(arcpy.GetParameterAsText(8))
 
@@ -91,7 +92,7 @@ def reach_preparation(root_folder, fixed_points):
     # For each watershed:
     for watershed_folder in watershed_folders:
 
-        arcpy.AddMessage("Starting {}...".format(watershed_folder))
+        arcpy.AddMessage("Starting {}...".format(PNET_Functions.condense_watershed_name(watershed_folder)))
 
         # Get all file names
         output_folder = os.path.join(watershed_folder, "Intermediates", "Reach_Editing", "Inputs")
@@ -243,7 +244,7 @@ def reach_editing(root_folder):
     to_merge_reaches = []
 
     for watershed in watershed_folders:
-        arcpy.AddMessage("Starting {}...".format(watershed))
+        arcpy.AddMessage("Starting {}...".format(PNET_Functions.condense_watershed_name(watershed)))
 
         # Get file names
         input_folder = os.path.join(watershed, "Intermediates", "Reach_Editing", "Inputs")
@@ -393,7 +394,7 @@ def data_cleaning(root_folder):
     PNET_Functions.delete_old(projectwide_output)
 
     for watershed in watershed_folders:
-        arcpy.AddMessage("Starting {}...".format(watershed))
+        arcpy.AddMessage("Starting {}...".format(PNET_Functions.condense_watershed_name(watershed)))
 
         # Get necessary files
         output_folder = os.path.join(watershed, "Intermediates", "Extraction", "Inputs")
@@ -494,7 +495,7 @@ def data_network_input(root_folder, data_networks_list_in):
 
         for watershed in watershed_folders:
 
-            arcpy.AddMessage("\tStarting " + watershed + "...")
+            arcpy.AddMessage("\tStarting " + PNET_Functions.condense_watershed_name(watershed) + "...")
 
             # Get network to clip by
             old_stream_network = os.path.join(watershed, "Inputs", "Stream_Network", "Stream_Network.shp")
@@ -538,7 +539,7 @@ def data_network_extraction(root_folder, length_cutoff):
 
         network_list = get_data_networks(watershed_folder)
 
-        arcpy.AddMessage("Starting " + watershed_folder + "...")
+        arcpy.AddMessage("Starting " + PNET_Functions.condense_watershed_name(watershed_folder) + "...")
         for data_network_count, data_network in enumerate(network_list):
             if not PNET_Functions.is_empty(data_network):
 
@@ -1097,7 +1098,7 @@ def reach_merging(root_folder):
 
     # This loops for each watershed folder
     for watershed in watershed_folders:
-        arcpy.AddMessage("Working on {}...".format(watershed))
+        arcpy.AddMessage("Working on {}...".format(PNET_Functions.condense_watershed_name(watershed)))
 
         # Initialize list of all unique data networks within this watershed
         point_list = get_data_points(watershed)
@@ -1210,7 +1211,7 @@ def calculate_d50(root_folder):
     for watershed in watershed_folders:
 
         # get filepath
-        arcpy.AddMessage("Working on {}...".format(watershed))
+        arcpy.AddMessage("Working on {}...".format(PNET_Functions.condense_watershed_name(watershed)))
         watershed_extracted = os.path.join(watershed, data_path)
 
         # Check to make sure we have the necessary fields
@@ -1262,7 +1263,6 @@ def numerical_comparisons(root_folder, field_db, input_field_csv):
     # Setup projectwide data
 
     projectwide_output = PNET_Functions.make_folder(os.path.join(root_folder, "00_ProjectWide", "Outputs", "Comparisons"), "Numerical")
-    save_db(field_db, os.path.join(root_folder, "00_ProjectWide"))
     PNET_Functions.delete_old(projectwide_output)
 
     keep_fields = ["FID", "Shape", "POINT_X", "POINT_Y", "SnapDist", "FldRchLen",
@@ -1280,7 +1280,7 @@ def numerical_comparisons(root_folder, field_db, input_field_csv):
         old_field_db_fields = field_db_fields
         old_new_fields_initial = new_fields_initial
 
-        arcpy.AddMessage("Working on {}...".format(watershed))
+        arcpy.AddMessage("Working on {}...".format(PNET_Functions.condense_watershed_name(watershed)))
         arcpy.AddMessage("\t Combining Data...")
 
         # Setup watershed data
@@ -1318,7 +1318,7 @@ def numerical_comparisons(root_folder, field_db, input_field_csv):
             pnet_compare_list.append(to_add)
 
         # Get the CSV with Field data
-        watershed_db = save_db(field_db, watershed)
+        watershed_db = field_db
 
         # Get data from the field database
         field_data_list = PNET_Functions.csv_to_list(watershed_db)
@@ -1477,8 +1477,8 @@ def numerical_comparisons(root_folder, field_db, input_field_csv):
     PNET_Functions.create_csv(os.path.join(projectwide_output, "Numerical_Comparison_Data.csv"), merged)
 
 
-def save_db(database, main_folder):
-    save_loc = os.path.join(main_folder, "Inputs", "Database", "Field_Database.csv")
+def save_db(database, main_folder, name):
+    save_loc = os.path.join(main_folder, "Inputs", "Database", name)
     shutil.copyfile(database, save_loc)
     return save_loc
 
@@ -1509,7 +1509,18 @@ def categorical_comparisons(root_folder, input_comparison_field_csv):
     arcpy.env.overwriteOutput = True
     watershed_folders = PNET_Functions.get_watershed_folders(root_folder)
 
-    # Setup projectwide data
+    # Save databases
+    save_db(field_db, os.path.join(root_folder, "00_Projectwide"), "Field_Database.csv")
+    save_db(input_field_csv, os.path.join(root_folder, "00_Projectwide"), "Numerical_Comparison.csv")
+    save_db(input_comparison_field_csv, os.path.join(root_folder, "00_Projectwide"), "Categorical_Comparison.csv")
+
+    for watershed in watershed_folders:
+        save_db(field_db, watershed, "Field_Database.csv")
+        save_db(input_field_csv, watershed, "Numerical_Comparison.csv")
+        save_db(input_comparison_field_csv, watershed, "Categorical_Comparison.csv")
+
+
+
     projectwide_output = PNET_Functions.make_folder(os.path.join(root_folder, "00_ProjectWide", "Outputs", "Comparisons"), "Categorical")
     projectwide_database = os.path.join(root_folder, "00_ProjectWide", "Inputs", "Database", "Field_Database.csv")
     PNET_Functions.delete_old(projectwide_output)
@@ -1523,7 +1534,7 @@ def categorical_comparisons(root_folder, input_comparison_field_csv):
     #  set the field lists to the values from the file
     # meta_group_field, meta_group_field_name, group_field, group_field_name, field_db_fields = read_comparison_field_csv(input_field_csv)
 
-    graphs = read_field_csv_new(input_field_csv)
+    graphs = read_field_csv_new(input_comparison_field_csv)
 
     for graph in graphs:
 
@@ -1544,7 +1555,7 @@ def categorical_comparisons(root_folder, input_comparison_field_csv):
 
         for watershed in watershed_folders:
 
-            arcpy.AddMessage("\tWorking on {}...".format(watershed))
+            arcpy.AddMessage("\tWorking on {}...".format(PNET_Functions.condense_watershed_name(watershed)))
 
             # Setup watershed data
             watershed_output = PNET_Functions.make_folder(os.path.join(watershed, "Outputs", "Comparisons"), "Categorical")
@@ -1561,7 +1572,10 @@ def categorical_comparisons(root_folder, input_comparison_field_csv):
             id_field_db = field_data_list[0].index("""RchID""")
             field_indexes_db = []
             for field_db_field in field_db_fields:
-                field_indexes_db.append(field_data_list[0].index(field_db_field))
+                try:
+                    field_indexes_db.append(field_data_list[0].index(field_db_field))
+                except:
+                    raise Exception("The field [{}] could not be found in [{}]".format(field_db_field, watershed_db))
 
             # remove headers
             field_data_list.pop(0)
@@ -1578,7 +1592,9 @@ def categorical_comparisons(root_folder, input_comparison_field_csv):
                 field_compare_list.append(to_add)
 
             # Get the CSV with extracted PNET data
-            watershed_pnet = os.path.join(watershed, "Outputs", "Extracted_Data", "All_Data.csv")
+            # TODO uncomment this
+            # watershed_pnet = os.path.join(watershed, "Outputs", "Extracted_Data", "All_Data.csv")
+            watershed_pnet = r'C:\Users\A02079569\Desktop\PIBO_New\Experimenting_With_Merging_CSVs\super_merge.csv'
 
             # Get data from the PNET output
             pnet_data_list = PNET_Functions.csv_to_list(watershed_pnet)
@@ -1586,9 +1602,9 @@ def categorical_comparisons(root_folder, input_comparison_field_csv):
             # Find certain PNET indexes in the PNET output
             id_pnet = pnet_data_list[0].index("""RchID""")
             if group_field not in pnet_data_list[0]:
-                arcpy.AddMessage("Could not complete plots for {}, could not find {} field".format(watershed, group_field))
+                arcpy.AddMessage("\t\tCould not complete plots for {}, could not find {} field in {}".format(PNET_Functions.condense_watershed_name(watershed), group_field, watershed_pnet))
             elif meta_exists and meta_group_field not in pnet_data_list[0]:
-                arcpy.AddMessage("Could not complete plots for {}, could not find {} field".format(watershed, meta_group_field))
+                arcpy.AddMessage("\t\tCould not complete plots for {}, could not find {} field in {}".format(PNET_Functions.condense_watershed_name(watershed), meta_group_field, watershed_pnet))
             else:
                 group_pnet = pnet_data_list[0].index(group_field)
                 if meta_exists:
@@ -1619,7 +1635,7 @@ def categorical_comparisons(root_folder, input_comparison_field_csv):
 
                 for new_field in field_db_fields:
                     # This is where field data will go
-                    new_fields.append("Y_" + new_field[:8])
+                    new_fields.append("Y" + new_field[:9])
 
                 # Perform data comparisons
 
@@ -1703,10 +1719,18 @@ def categorical_comparisons(root_folder, input_comparison_field_csv):
                     with arcpy.da.SearchCursor(template, '*') as searcher:
                         for row, search_row in zip(iter_list, searcher):
                             # Steal Shape and FID data from template
-                            row[0] = search_row[0]
-                            row[1] = search_row[1]
+                            row.insert(0, search_row[1])
+                            row.insert(0, search_row[0])
                             # Add in row
-                            inserter.insertRow(row)
+                            try:
+                                inserter.insertRow(row)
+                            except TypeError:
+                                arcpy.AddMessage("Comparison Points:")
+                                arcpy.AddMessage(PNET_Functions.get_fields(comparison_points))
+                                arcpy.AddMessage("Comparisons List:")
+                                arcpy.AddMessage(both_compare_list[0])
+                                raise Exception("Compairison Points Shapefile has an enexpected number of fields compared to the number of fields that are being compared. "
+                                                "\nThese two lists should match. This happens often if your fields are not unique within the first 9 characters.")
 
                 # Save as CSV
                 PNET_Functions.create_csv(os.path.join(watershed_output, "Categorical_Comparison_Data.csv"), comparison_points)
@@ -1756,7 +1780,12 @@ def categorical_comparisons(root_folder, input_comparison_field_csv):
         # Do projectwide
         arcpy.AddMessage('\tSaving ProjectWide...')
         save_loc = os.path.join(projectwide_output, "Categorical_Comparison_Points_{}.shp".format(group_field_name))
-        merged = arcpy.Merge_management(to_merge, save_loc)
+
+        try:
+            merged = arcpy.Merge_management(to_merge, save_loc)
+        except:
+            raise Exception(" Could not merge Categorical Comparison Points. This usually happens if there were no comparisons made, so make sure that the comparisons above are functioning")
+
         PNET_Functions.create_csv(os.path.join(projectwide_output, "Categorical_Comparison_Data.csv"), merged)
 
         if meta_exists:
@@ -1843,7 +1872,7 @@ def get_data(data_shapefile, group_field, y_axis_field):
 
     # Pull comparison values from the comparison points shapefile
     actual_group_field = group_field[:10]
-    actual_y_axis_field = "Y_" + y_axis_field[:8]
+    actual_y_axis_field = "Y" + y_axis_field[:9]
 
     groups_list = unique_values(data_shapefile, actual_group_field)
 
