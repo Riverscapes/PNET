@@ -14,6 +14,10 @@ import csv
 # -------------------------------------------------------------------------------
 
 
+def condense_watershed_name(watershed_folder):
+    return watershed_folder.split("\\")[-1]
+
+
 def parse_bool(parameter):
     return parameter == 'true'
 
